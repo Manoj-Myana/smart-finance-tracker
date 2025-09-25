@@ -1,0 +1,2 @@
+# This is a placeholder to ensure no old favicon.ico is used
+# The actual favicon is loaded from the SVG files and data URL in index.html

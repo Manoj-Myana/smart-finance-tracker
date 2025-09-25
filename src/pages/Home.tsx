@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Home: React.FC = () => {
   return (
@@ -34,9 +35,12 @@ const Home: React.FC = () => {
               Take control of your financial future with our intelligent money tracking system. 
               Monitor every penny and make informed decisions with cutting-edge technology.
             </p>
-            <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg">
+            <Link 
+              to="/signup"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg inline-block no-underline"
+            >
               Get Started Free
-            </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -305,10 +309,13 @@ const Home: React.FC = () => {
             Join over <span className="font-bold">50,000+</span> users who have already taken control of their finances with our smart platform
           </p>
           <div className="space-y-4 md:space-y-0 md:space-x-6 md:flex md:justify-center">
-            <button className="bg-white text-purple-600 font-semibold py-4 px-8 rounded-xl text-lg hover:bg-gray-100 transition-all transform hover:scale-105 w-full md:w-auto shadow-2xl">
+            <Link 
+              to="/signup"
+              className="bg-white text-purple-600 font-semibold py-4 px-8 rounded-xl text-lg hover:bg-gray-100 transition-all transform hover:scale-105 w-full md:w-auto shadow-2xl inline-block no-underline text-center"
+            >
               Start Free Trial
-            </button>
-            <button className="border-2 border-white text-white font-semibold py-4 px-8 rounded-xl text-lg hover:bg-white hover:text-purple-600 transition-all transform hover:scale-105 w-full md:w-auto">
+            </Link>
+            <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 w-full md:w-auto shadow-lg">
               Watch Demo
             </button>
           </div>

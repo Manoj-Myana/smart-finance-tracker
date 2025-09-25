@@ -12,26 +12,30 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
   if (isHomePage) {
     // Home page navbar: Logo left, Login/Signup right
     return (
-      <nav className="bg-white shadow-lg border-b">
+      <nav className="bg-gradient-to-r from-slate-100 via-blue-100 to-indigo-200 shadow-2xl border-b border-white/30 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-2">
-                <Wallet className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Smart Finance Tracker</span>
+              <Link to="/" className="flex items-center space-x-3 hover:scale-105 transition-transform no-underline">
+                <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg">
+                  <Wallet className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent no-underline">
+                  Smart Finance Tracker
+                </span>
               </Link>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <Link
                 to="/login"
-                className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-105 transform no-underline"
               >
                 Login
               </Link>
               <Link
                 to="/signup"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition-colors"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-105 transform no-underline"
               >
                 Sign Up
               </Link>
@@ -53,17 +57,21 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
   ];
 
   return (
-    <nav className="bg-white shadow-lg border-b">
+    <nav className="bg-gradient-to-r from-slate-100 via-blue-100 to-indigo-200 shadow-2xl border-b border-white/30 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <Wallet className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">Smart Finance Tracker</span>
+            <Link to="/" className="flex items-center space-x-3 hover:scale-105 transition-transform no-underline">
+              <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg">
+                <Wallet className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent no-underline">
+                Smart Finance Tracker
+              </span>
             </Link>
           </div>
           
-          <div className="flex items-center space-x-8">
+          <div className="flex items-center space-x-2">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               
@@ -71,10 +79,10 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105 no-underline ${
                     isActive
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                      : 'text-gray-700 hover:text-blue-600 hover:bg-white/60 backdrop-blur-sm'
                   }`}
                 >
                   {item.label}
