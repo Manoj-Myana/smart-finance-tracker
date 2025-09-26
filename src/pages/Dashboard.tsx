@@ -52,11 +52,18 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0, #cbd5e1)',
+          backgroundAttachment: 'fixed',
+          minHeight: '100vh'
+        }}
+      >
         <div className="text-center">
           <div className="relative">
-            <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-pulse"></div>
-            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+            <div className="w-16 h-16 border-4 border-gray-600 rounded-full animate-pulse"></div>
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
           </div>
           <p className="text-gray-600 mt-4 font-medium">Loading your dashboard...</p>
         </div>
@@ -65,7 +72,17 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div 
+      className="min-h-screen"
+      style={{
+        background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0, #cbd5e1) !important',
+        backgroundAttachment: 'fixed',
+        minHeight: '100vh',
+        width: '100%',
+        position: 'relative',
+        zIndex: 1
+      }}
+    >
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header Section */}
@@ -85,70 +102,94 @@ const Dashboard: React.FC = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Balance Card */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+          <div 
+            className="backdrop-blur-sm rounded-2xl shadow-lg border border-green-100/50 p-6 hover:shadow-xl transition-all"
+            style={{
+              backgroundColor: 'rgba(240, 253, 244, 0.9)',
+              backgroundImage: 'none'
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-green-50 rounded-xl">
+              <div className="p-3 bg-green-100 rounded-xl">
                 <DollarSign className="h-6 w-6 text-green-600" />
               </div>
-              <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1 text-green-600 bg-green-100 px-2 py-1 rounded-full">
                 <ArrowUpRight className="h-3 w-3" />
                 <span className="text-xs font-semibold">+12.5%</span>
               </div>
             </div>
-            <p className="text-gray-600 text-sm font-medium mb-1">Total Balance</p>
+            <p className="text-gray-700 text-sm font-medium mb-1">Total Balance</p>
             <p className="text-3xl font-bold text-gray-900">$24,500.00</p>
-            <p className="text-xs text-gray-500 mt-1">All accounts combined</p>
+            <p className="text-xs text-gray-600 mt-1">All accounts combined</p>
           </div>
 
           {/* Monthly Income Card */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+          <div 
+            className="backdrop-blur-sm rounded-2xl shadow-lg border border-blue-100/50 p-6 hover:shadow-xl transition-all"
+            style={{
+              backgroundColor: 'rgba(239, 246, 255, 0.9)',
+              backgroundImage: 'none'
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-blue-50 rounded-xl">
+              <div className="p-3 bg-blue-100 rounded-xl">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
               </div>
-              <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1 text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
                 <ArrowUpRight className="h-3 w-3" />
                 <span className="text-xs font-semibold">+8.2%</span>
               </div>
             </div>
-            <p className="text-gray-600 text-sm font-medium mb-1">Monthly Income</p>
+            <p className="text-gray-700 text-sm font-medium mb-1">Monthly Income</p>
             <p className="text-3xl font-bold text-gray-900">$8,200.00</p>
-            <p className="text-xs text-gray-500 mt-1">From 3 sources</p>
+            <p className="text-xs text-gray-600 mt-1">From 3 sources</p>
           </div>
 
           {/* Monthly Expenses Card */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+          <div 
+            className="backdrop-blur-sm rounded-2xl shadow-lg border border-red-100/50 p-6 hover:shadow-xl transition-all"
+            style={{
+              backgroundColor: 'rgba(254, 242, 242, 0.9)',
+              backgroundImage: 'none'
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-red-50 rounded-xl">
+              <div className="p-3 bg-red-100 rounded-xl">
                 <TrendingDown className="h-6 w-6 text-red-600" />
               </div>
-              <div className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1 text-red-600 bg-red-100 px-2 py-1 rounded-full">
                 <ArrowDownRight className="h-3 w-3" />
                 <span className="text-xs font-semibold">-3.1%</span>
               </div>
             </div>
-            <p className="text-gray-600 text-sm font-medium mb-1">Monthly Expenses</p>
+            <p className="text-gray-700 text-sm font-medium mb-1">Monthly Expenses</p>
             <p className="text-3xl font-bold text-gray-900">$3,750.00</p>
-            <p className="text-xs text-gray-500 mt-1">Across 12 categories</p>
+            <p className="text-xs text-gray-600 mt-1">Across 12 categories</p>
           </div>
 
           {/* Savings Goal Card */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+          <div 
+            className="backdrop-blur-sm rounded-2xl shadow-lg border border-purple-100/50 p-6 hover:shadow-xl transition-all"
+            style={{
+              backgroundColor: 'rgba(250, 245, 255, 0.9)',
+              backgroundImage: 'none'
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-purple-50 rounded-xl">
+              <div className="p-3 bg-purple-100 rounded-xl">
                 <Target className="h-6 w-6 text-purple-600" />
               </div>
-              <div className="flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1 text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
                 <span className="text-xs font-semibold">73%</span>
               </div>
             </div>
-            <p className="text-gray-600 text-sm font-medium mb-1">Savings Goal</p>
+            <p className="text-gray-700 text-sm font-medium mb-1">Savings Goal</p>
             <p className="text-3xl font-bold text-gray-900">$7,300</p>
             <div className="mt-3">
-              <div className="w-full bg-gray-100 rounded-full h-2">
+              <div className="w-full bg-gray-200 rounded-full h-2">
                 <div className="bg-purple-600 h-2 rounded-full w-3/4 transition-all"></div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">$2,700 to go</p>
+              <p className="text-xs text-gray-600 mt-2">$2,700 to go</p>
             </div>
           </div>
         </div>
@@ -157,7 +198,13 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Quick Actions */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+            <div 
+              className="backdrop-blur-sm rounded-2xl shadow-lg border border-orange-100/50 p-6"
+              style={{
+                backgroundColor: 'rgba(255, 247, 237, 0.8)',
+                backgroundImage: 'none'
+              }}
+            >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-900">Quick Actions</h3>
                 <button className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline">View All</button>
@@ -206,7 +253,13 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Recent Transactions */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+            <div 
+              className="backdrop-blur-sm rounded-2xl shadow-lg border border-indigo-100/50 p-6"
+              style={{
+                backgroundColor: 'rgba(238, 242, 255, 0.8)',
+                backgroundImage: 'none'
+              }}
+            >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-900">Recent Transactions</h3>
                 <button className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline">View All</button>
@@ -258,7 +311,13 @@ const Dashboard: React.FC = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Account Overview */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+            <div 
+              className="backdrop-blur-sm rounded-2xl shadow-lg border border-teal-100/50 p-6"
+              style={{
+                backgroundColor: 'rgba(240, 253, 250, 0.8)',
+                backgroundImage: 'none'
+              }}
+            >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-gray-900">Accounts</h3>
                 <Eye className="h-5 w-5 text-gray-400" />
@@ -293,7 +352,13 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Monthly Goals */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+            <div 
+              className="backdrop-blur-sm rounded-2xl shadow-lg border border-pink-100/50 p-6"
+              style={{
+                backgroundColor: 'rgba(253, 242, 248, 0.8)',
+                backgroundImage: 'none'
+              }}
+            >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-gray-900">Monthly Goals</h3>
                 <PieChart className="h-5 w-5 text-gray-400" />
@@ -322,7 +387,13 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Upcoming */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+            <div 
+              className="backdrop-blur-sm rounded-2xl shadow-lg border border-amber-100/50 p-6"
+              style={{
+                backgroundColor: 'rgba(255, 251, 235, 0.8)',
+                backgroundImage: 'none'
+              }}
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-900">Upcoming</h3>
                 <Calendar className="h-5 w-5 text-gray-400" />

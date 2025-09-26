@@ -63,7 +63,7 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-3 hover:scale-105 transition-transform no-underline">
+              <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center space-x-3 hover:scale-105 transition-transform no-underline">
                 <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg">
                   <Wallet className="h-6 w-6 text-white" />
                 </div>
@@ -122,7 +122,7 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-3 hover:scale-105 transition-transform no-underline">
+            <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center space-x-3 hover:scale-105 transition-transform no-underline">
               <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg">
                 <Wallet className="h-6 w-6 text-white" />
               </div>
