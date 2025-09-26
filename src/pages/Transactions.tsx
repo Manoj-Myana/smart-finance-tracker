@@ -11,7 +11,8 @@ import {
   Filter,
   Search,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Edit
 } from 'lucide-react';
 
 interface Transaction {
@@ -45,6 +46,7 @@ const Transactions: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -106,6 +108,39 @@ const Transactions: React.FC = () => {
     }));
   };
 
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setFormData({
+      date: transaction.date,
+      description: transaction.description,
+      amount: transaction.amount.toString(),
+      type: transaction.type,
+      frequency: transaction.frequency
+    });
+    // Scroll to form with smooth behavior
+    setTimeout(() => {
+      const formElement = document.getElementById('transaction-form');
+      if (formElement) {
+        formElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
+        });
+      }
+    }, 100);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTransaction(null);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+      amount: '',
+      type: 'credit',
+      frequency: 'regular'
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -113,9 +148,6 @@ const Transactions: React.FC = () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('authToken');
-      console.log('Submitting transaction:', formData);
-      console.log('User:', user);
-      console.log('Token:', token ? 'Present' : 'Missing');
       
       const requestBody = {
         user_id: user.id,
@@ -125,17 +157,32 @@ const Transactions: React.FC = () => {
         type: formData.type,
         frequency: formData.frequency
       };
+
+      let response;
       
-      console.log('Request body:', requestBody);
-      
-      const response = await fetch('http://localhost:5000/api/transactions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+      if (editingTransaction) {
+        // Update existing transaction
+        console.log('Updating transaction:', editingTransaction.id, requestBody);
+        response = await fetch(`http://localhost:5000/api/transactions/${editingTransaction.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+      } else {
+        // Create new transaction
+        console.log('Creating new transaction:', requestBody);
+        response = await fetch('http://localhost:5000/api/transactions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+      }
 
       console.log('Response status:', response.status);
       const responseData = await response.json();
@@ -150,15 +197,16 @@ const Transactions: React.FC = () => {
           type: 'credit',
           frequency: 'regular'
         });
+        setEditingTransaction(null);
         // Refresh transactions
         fetchTransactions(user.id);
       } else {
-        console.error('Failed to add transaction:', responseData);
-        alert(`Failed to add transaction: ${responseData.message || 'Please try again.'}`);
+        console.error(`Failed to ${editingTransaction ? 'update' : 'add'} transaction:`, responseData);
+        alert(`Failed to ${editingTransaction ? 'update' : 'add'} transaction: ${responseData.message || 'Please try again.'}`);
       }
     } catch (error) {
-      console.error('Error adding transaction:', error);
-      alert('Error adding transaction. Please try again.');
+      console.error(`Error ${editingTransaction ? 'updating' : 'adding'} transaction:`, error);
+      alert(`Error ${editingTransaction ? 'updating' : 'adding'} transaction. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -324,7 +372,7 @@ const Transactions: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Add Transaction Form */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1" id="transaction-form">
             <div 
               className="backdrop-blur-sm rounded-2xl shadow-lg border border-purple-100/50 p-6"
               style={{
@@ -334,16 +382,18 @@ const Transactions: React.FC = () => {
             >
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-3 bg-purple-100 rounded-xl">
-                  <Plus className="h-6 w-6 text-purple-600" />
+                  <Plus className="h-7 w-7 text-purple-600" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Add Transaction</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
+                </h2>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Calendar className="h-4 w-4 inline mr-2" />
+                  <label className="block text-lg font-medium text-gray-700 mb-3">
+                    <Calendar className="h-6 w-6 inline mr-3" />
                     Date
                   </label>
                   <input
@@ -352,14 +402,14 @@ const Transactions: React.FC = () => {
                     value={formData.date}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    className="w-full px-6 py-5 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   />
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <FileText className="h-4 w-4 inline mr-2" />
+                  <label className="block text-lg font-medium text-gray-700 mb-3">
+                    <FileText className="h-6 w-6 inline mr-3" />
                     Description
                   </label>
                   <textarea
@@ -369,14 +419,14 @@ const Transactions: React.FC = () => {
                     required
                     rows={3}
                     placeholder="Enter transaction description..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                    className="w-full px-6 py-5 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
                   />
                 </div>
 
                 {/* Amount */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <DollarSign className="h-4 w-4 inline mr-2" />
+                  <label className="block text-lg font-medium text-gray-700 mb-3">
+                    <DollarSign className="h-6 w-6 inline mr-3" />
                     Amount
                   </label>
                   <input
@@ -388,17 +438,17 @@ const Transactions: React.FC = () => {
                     min="0"
                     step="0.01"
                     placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    className="w-full px-6 py-5 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   />
                 </div>
 
                 {/* Transaction Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-lg font-medium text-gray-700 mb-3">
                     Transaction Type
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className={`flex items-center p-5 border-2 rounded-lg cursor-pointer transition-all ${
                       formData.type === 'credit' 
                         ? 'border-green-500 bg-green-50' 
                         : 'border-gray-200 hover:border-green-300'
@@ -411,10 +461,10 @@ const Transactions: React.FC = () => {
                         onChange={handleInputChange}
                         className="sr-only"
                       />
-                      <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
-                      <span className="text-sm font-medium text-gray-700">Credit</span>
+                      <TrendingUp className="h-7 w-7 text-green-600 mr-4" />
+                      <span className="text-lg font-medium text-gray-700">Credit</span>
                     </label>
-                    <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                    <label className={`flex items-center p-5 border-2 rounded-lg cursor-pointer transition-all ${
                       formData.type === 'debit' 
                         ? 'border-red-500 bg-red-50' 
                         : 'border-gray-200 hover:border-red-300'
@@ -427,22 +477,22 @@ const Transactions: React.FC = () => {
                         onChange={handleInputChange}
                         className="sr-only"
                       />
-                      <TrendingDown className="h-5 w-5 text-red-600 mr-2" />
-                      <span className="text-sm font-medium text-gray-700">Debit</span>
+                      <TrendingDown className="h-7 w-7 text-red-600 mr-4" />
+                      <span className="text-lg font-medium text-gray-700">Debit</span>
                     </label>
                   </div>
                 </div>
 
                 {/* Frequency */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-lg font-medium text-gray-700 mb-3">
                     Frequency
                   </label>
                   <select
                     name="frequency"
                     value={formData.frequency}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    className="w-full px-6 py-5 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   >
                     <option value="regular">Regular</option>
                     <option value="irregular">Irregular</option>
@@ -450,23 +500,46 @@ const Transactions: React.FC = () => {
                 </div>
 
                 {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <div className="flex items-center justify-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Adding...
-                    </div>
-                  ) : (
-                    <>
-                      <Plus className="h-5 w-5 inline mr-2" />
-                      Add Transaction
-                    </>
+                <div className="space-y-3">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold text-lg px-6 py-5 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center justify-center">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+                        <span className="text-lg">{editingTransaction ? 'Updating...' : 'Adding...'}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center">
+                        <Plus className="h-6 w-6 mr-3" />
+                        <span className="text-lg">{editingTransaction ? 'Update Transaction' : 'Add Transaction'}</span>
+                      </div>
+                    )}
+                  </button>
+                  
+                  {editingTransaction && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="w-full text-white font-semibold text-lg px-6 py-5 rounded-xl shadow-lg hover:shadow-xl transition-all"
+                      style={{ 
+                        backgroundColor: '#ef4444', 
+                        backgroundImage: 'none',
+                        border: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#dc2626';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ef4444';
+                      }}
+                    >
+                      Cancel Edit
+                    </button>
                   )}
-                </button>
+                </div>
               </form>
             </div>
           </div>
@@ -480,29 +553,37 @@ const Transactions: React.FC = () => {
                 backgroundImage: 'none'
               }}
             >
-              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                <h2 className="text-xl font-bold text-gray-900">Transaction History</h2>
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                <h2 className="text-2xl font-bold text-gray-900">Transaction History</h2>
                 
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-4">
                   {/* Search */}
-                  <div className="relative">
-                    <Search className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <div className="relative flex items-center">
+                    <Search 
+                      className="h-6 w-6 absolute top-1/2 transform -translate-y-1/2 text-gray-400 z-10" 
+                      style={{ left: '24px' }}
+                    />
                     <input
                       type="text"
                       placeholder="Search transactions..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="pr-6 py-4 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm min-w-[260px] flex items-center"
+                      style={{ paddingLeft: '56px', backgroundImage: 'none' }}
                     />
                   </div>
                   
                   {/* Filter */}
-                  <div className="relative">
-                    <Filter className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <div className="relative flex items-center">
+                    <Filter 
+                      className="h-6 w-6 absolute top-1/2 transform -translate-y-1/2 text-gray-400 z-10" 
+                      style={{ left: '24px' }}
+                    />
                     <select
                       value={filter}
                       onChange={(e) => setFilter(e.target.value)}
-                      className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white"
+                      className="pr-12 py-4 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white shadow-sm min-w-[200px] flex items-center"
+                      style={{ paddingLeft: '56px', backgroundImage: 'none' }}
                     >
                       <option value="all">All Types</option>
                       <option value="credit">Credit Only</option>
@@ -513,87 +594,100 @@ const Transactions: React.FC = () => {
               </div>
 
               {/* Transactions Table */}
-              <div className="overflow-x-auto">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {filteredTransactions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4">
-                      <FileText className="h-8 w-8 text-gray-400 mx-auto" />
+                  <div className="text-center py-16">
+                    <div className="p-4 bg-gray-50 rounded-full w-20 h-20 mx-auto mb-6">
+                      <FileText className="h-12 w-12 text-gray-400 mx-auto" />
                     </div>
-                    <p className="text-gray-500 text-lg font-medium">No transactions found</p>
-                    <p className="text-gray-400 text-sm mt-1">
+                    <p className="text-gray-600 text-xl font-medium mb-2">No transactions found</p>
+                    <p className="text-gray-400 text-base">
                       {transactions.length === 0 
                         ? "Add your first transaction to get started!" 
                         : "Try adjusting your search or filter criteria."}
                     </p>
                   </div>
                 ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Description</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Type</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Frequency</th>
-                        <th className="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
-                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTransactions.map((transaction) => (
-                        <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="py-4 px-4 text-sm text-gray-600">
-                            {new Date(transaction.date).toLocaleDateString()}
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="max-w-xs">
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {transaction.description}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              transaction.type === 'credit' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {transaction.type === 'credit' ? (
-                                <TrendingUp className="h-3 w-3 mr-1" />
-                              ) : (
-                                <TrendingDown className="h-3 w-3 mr-1" />
-                              )}
-                              {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              transaction.frequency === 'regular' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {transaction.frequency.charAt(0).toUpperCase() + transaction.frequency.slice(1)}
-                            </span>
-                          </td>
-                          <td className={`py-4 px-4 text-right font-semibold ${
-                            transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {transaction.type === 'credit' ? '+' : '-'}${transaction.amount.toFixed(2)}
-                          </td>
-                          <td className="py-4 px-4 text-center">
-                            <div className="flex items-center justify-center space-x-2">
-                              <button
-                                onClick={() => handleDeleteTransaction(transaction.id)}
-                                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Delete transaction"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Date</th>
+                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Description</th>
+                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Type</th>
+                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Frequency</th>
+                          <th className="text-right py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Amount</th>
+                          <th className="text-center py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredTransactions.map((transaction, index) => (
+                          <tr key={transaction.id} className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                            <td className="py-6 px-6 text-base text-gray-600 font-medium">
+                              {new Date(transaction.date).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </td>
+                            <td className="py-6 px-6">
+                              <div className="max-w-xs">
+                                <p className="text-lg font-medium text-gray-900 truncate">
+                                  {transaction.description}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="py-6 px-6">
+                              <span className={`inline-flex items-center px-4 py-2 rounded-full text-base font-medium ${
+                                transaction.type === 'credit' 
+                                  ? 'bg-green-100 text-green-700 border border-green-200' 
+                                  : 'bg-red-100 text-red-700 border border-red-200'
+                              }`}>
+                                {transaction.type === 'credit' ? (
+                                  <TrendingUp className="h-5 w-5 mr-2" />
+                                ) : (
+                                  <TrendingDown className="h-5 w-5 mr-2" />
+                                )}
+                                {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                              </span>
+                            </td>
+                            <td className="py-6 px-6">
+                              <span className={`inline-flex items-center px-4 py-2 rounded-full text-base font-medium ${
+                                transaction.frequency === 'regular' 
+                                  ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                                  : 'bg-amber-100 text-amber-700 border border-amber-200'
+                              }`}>
+                                {transaction.frequency.charAt(0).toUpperCase() + transaction.frequency.slice(1)}
+                              </span>
+                            </td>
+                            <td className={`py-6 px-6 text-right font-bold text-lg ${
+                              transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {transaction.type === 'credit' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                            </td>
+                            <td className="py-6 px-6 text-center">
+                              <div className="flex items-center justify-center space-x-2">
+                                <button
+                                  onClick={() => handleEditTransaction(transaction)}
+                                  className="p-3 text-blue-500 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-200"
+                                  title="Edit transaction"
+                                >
+                                  <Edit className="h-6 w-6" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTransaction(transaction.id)}
+                                  className="p-3 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-xl transition-all duration-200 border border-transparent hover:border-red-200"
+                                  title="Delete transaction"
+                                >
+                                  <Trash2 className="h-6 w-6" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>

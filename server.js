@@ -466,6 +466,142 @@ app.post('/api/transactions', authenticateToken, (req, res) => {
   }
 });
 
+// Update a transaction
+app.put('/api/transactions/:id', authenticateToken, (req, res) => {
+  try {
+    console.log('Update transaction request received:', req.params.id, req.body);
+    console.log('Authenticated user:', req.user);
+    
+    const { id } = req.params;
+    const { user_id, date, description, amount, type, frequency } = req.body;
+    
+    // Verify user can only update transactions for themselves
+    if (parseInt(user_id) !== req.user.userId) {
+      console.log('Access denied: user_id mismatch', parseInt(user_id), req.user.userId);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Validation
+    if (!user_id || !date || !description || !amount || !type || !frequency) {
+      console.log('Validation failed: missing fields', { user_id, date, description, amount, type, frequency });
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    if (type !== 'credit' && type !== 'debit') {
+      console.log('Invalid transaction type:', type);
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction type must be either credit or debit'
+      });
+    }
+
+    if (frequency !== 'regular' && frequency !== 'irregular') {
+      console.log('Invalid frequency:', frequency);
+      return res.status(400).json({
+        success: false,
+        message: 'Frequency must be either regular or irregular'
+      });
+    }
+
+    if (isNaN(amount) || parseFloat(amount) <= 0) {
+      console.log('Invalid amount:', amount);
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    // First, verify the transaction belongs to the authenticated user
+    db.get(
+      'SELECT user_id FROM transactions WHERE id = ?',
+      [id],
+      (err, row) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+          });
+        }
+
+        if (!row) {
+          return res.status(404).json({
+            success: false,
+            message: 'Transaction not found'
+          });
+        }
+
+        if (row.user_id !== req.user.userId) {
+          return res.status(403).json({
+            success: false,
+            message: 'Access denied'
+          });
+        }
+
+        // Update the transaction
+        console.log('Updating transaction in database...');
+        db.run(
+          `UPDATE transactions 
+           SET date = ?, description = ?, amount = ?, type = ?, frequency = ?
+           WHERE id = ?`,
+          [date, description, parseFloat(amount), type, frequency, id],
+          function(err) {
+            if (err) {
+              console.error('Database error during update:', err);
+              return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+              });
+            }
+
+            if (this.changes === 0) {
+              return res.status(404).json({
+                success: false,
+                message: 'Transaction not found'
+              });
+            }
+
+            console.log('Transaction updated successfully');
+            // Get the updated transaction
+            db.get(
+              'SELECT * FROM transactions WHERE id = ?',
+              [id],
+              (err, updatedRow) => {
+                if (err) {
+                  console.error('Database error during retrieval:', err);
+                  return res.status(500).json({
+                    success: false,
+                    message: 'Transaction updated but failed to retrieve'
+                  });
+                }
+
+                console.log('Updated transaction retrieved successfully:', updatedRow);
+                res.json({
+                  success: true,
+                  message: 'Transaction updated successfully',
+                  transaction: updatedRow
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Update transaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 // Delete a transaction
 app.delete('/api/transactions/:id', authenticateToken, (req, res) => {
   try {
