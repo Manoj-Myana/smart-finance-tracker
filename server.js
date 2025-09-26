@@ -43,6 +43,18 @@ db.serialize(() => {
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount REAL NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('credit', 'debit')),
+    frequency TEXT NOT NULL CHECK (frequency IN ('regular', 'irregular')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
 });
 
 // Middleware
@@ -52,6 +64,30 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Middleware for protected routes
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Access token is required' 
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Invalid or expired token' 
+      });
+    }
+    req.user = user;
+    next();
+  });
+};
 
 // Signup endpoint
 app.post('/api/auth/signup', async (req, res) => {
@@ -292,12 +328,228 @@ app.post('/api/auth/logout', (req, res) => {
   }
 });
 
+// Transaction Routes
+
+// Get all transactions for a user
+app.get('/api/transactions/:userId', authenticateToken, (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Verify user can only access their own transactions
+    if (parseInt(userId) !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    db.all(
+      `SELECT * FROM transactions 
+       WHERE user_id = ? 
+       ORDER BY date DESC, created_at DESC`,
+      [userId],
+      (err, rows) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+          });
+        }
+
+        res.json(rows);
+      }
+    );
+  } catch (error) {
+    console.error('Get transactions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Add a new transaction
+app.post('/api/transactions', authenticateToken, (req, res) => {
+  try {
+    console.log('Add transaction request received:', req.body);
+    console.log('Authenticated user:', req.user);
+    
+    const { user_id, date, description, amount, type, frequency } = req.body;
+    
+    // Verify user can only add transactions for themselves
+    if (parseInt(user_id) !== req.user.userId) {
+      console.log('Access denied: user_id mismatch', parseInt(user_id), req.user.userId);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Validation
+    if (!user_id || !date || !description || !amount || !type || !frequency) {
+      console.log('Validation failed: missing fields', { user_id, date, description, amount, type, frequency });
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    if (type !== 'credit' && type !== 'debit') {
+      console.log('Invalid transaction type:', type);
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction type must be either credit or debit'
+      });
+    }
+
+    if (frequency !== 'regular' && frequency !== 'irregular') {
+      console.log('Invalid frequency:', frequency);
+      return res.status(400).json({
+        success: false,
+        message: 'Frequency must be either regular or irregular'
+      });
+    }
+
+    if (isNaN(amount) || parseFloat(amount) <= 0) {
+      console.log('Invalid amount:', amount);
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be a positive number'
+      });
+    }
+
+    console.log('Inserting transaction into database...');
+    db.run(
+      `INSERT INTO transactions (user_id, date, description, amount, type, frequency, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [user_id, date, description, parseFloat(amount), type, frequency],
+      function(err) {
+        if (err) {
+          console.error('Database error during insert:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+          });
+        }
+
+        console.log('Transaction inserted successfully, ID:', this.lastID);
+        // Get the created transaction
+        db.get(
+          'SELECT * FROM transactions WHERE id = ?',
+          [this.lastID],
+          (err, row) => {
+            if (err) {
+              console.error('Database error during retrieval:', err);
+              return res.status(500).json({
+                success: false,
+                message: 'Transaction created but failed to retrieve'
+              });
+            }
+
+            console.log('Transaction retrieved successfully:', row);
+            res.status(201).json({
+              success: true,
+              message: 'Transaction added successfully',
+              transaction: row
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Add transaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Delete a transaction
+app.delete('/api/transactions/:id', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // First, verify the transaction belongs to the authenticated user
+    db.get(
+      'SELECT user_id FROM transactions WHERE id = ?',
+      [id],
+      (err, row) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+          });
+        }
+
+        if (!row) {
+          return res.status(404).json({
+            success: false,
+            message: 'Transaction not found'
+          });
+        }
+
+        if (row.user_id !== req.user.userId) {
+          return res.status(403).json({
+            success: false,
+            message: 'Access denied'
+          });
+        }
+
+        // Delete the transaction
+        db.run(
+          'DELETE FROM transactions WHERE id = ?',
+          [id],
+          function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+              });
+            }
+
+            if (this.changes === 0) {
+              return res.status(404).json({
+                success: false,
+                message: 'Transaction not found'
+              });
+            }
+
+            res.json({
+              success: true,
+              message: 'Transaction deleted successfully'
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Delete transaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
     message: 'Smart Finance Tracker API is running!',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Test authentication endpoint
+app.get('/api/test-auth', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Authentication working',
+    user: req.user
   });
 });
 
