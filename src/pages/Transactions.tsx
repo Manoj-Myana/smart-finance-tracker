@@ -47,6 +47,17 @@ const Transactions: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  
+  // New filter states
+  const [sortBy, setSortBy] = useState<'none' | 'newest' | 'oldest'>('none');
+  const [dateRangeFrom, setDateRangeFrom] = useState('');
+  const [dateRangeTo, setDateRangeTo] = useState('');
+  const [specificDate, setSpecificDate] = useState('');
+  const [amountGreaterThan, setAmountGreaterThan] = useState('');
+  const [amountLessThan, setAmountLessThan] = useState('');
+  const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'regular' | 'irregular'>('all');
+  const [dateFilterType, setDateFilterType] = useState<'all' | 'range' | 'specific'>('all');
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -237,11 +248,44 @@ const Transactions: React.FC = () => {
     }
   };
 
-  // Filter and search transactions
+  // Filter and search transactions with new comprehensive filters
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesFilter = filter === 'all' || transaction.type === filter;
+    // Basic type filter
+    const matchesTypeFilter = filter === 'all' || transaction.type === filter;
+    
+    // Search filter
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
+    
+    // Frequency filter
+    const matchesFrequency = frequencyFilter === 'all' || transaction.frequency === frequencyFilter;
+    
+    // Date filters
+    let matchesDateFilter = true;
+    if (dateFilterType === 'range' && dateRangeFrom && dateRangeTo) {
+      const transactionDate = new Date(transaction.date);
+      const fromDate = new Date(dateRangeFrom);
+      const toDate = new Date(dateRangeTo);
+      matchesDateFilter = transactionDate >= fromDate && transactionDate <= toDate;
+    } else if (dateFilterType === 'specific' && specificDate) {
+      matchesDateFilter = transaction.date === specificDate;
+    }
+    
+    // Amount filters
+    let matchesAmountFilter = true;
+    if (amountGreaterThan && transaction.amount <= parseFloat(amountGreaterThan)) {
+      matchesAmountFilter = false;
+    }
+    if (amountLessThan && transaction.amount >= parseFloat(amountLessThan)) {
+      matchesAmountFilter = false;
+    }
+    
+    return matchesTypeFilter && matchesSearch && matchesFrequency && matchesDateFilter && matchesAmountFilter;
+  }).sort((a, b) => {
+    // Apply sorting
+    if (sortBy === 'none') return 0; // Keep original order
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
   });
 
   // Calculate totals
@@ -370,7 +414,7 @@ const Transactions: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Add Transaction Form */}
           <div className="lg:col-span-1" id="transaction-form">
             <div 
@@ -553,42 +597,401 @@ const Transactions: React.FC = () => {
                 backgroundImage: 'none'
               }}
             >
-              <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <h2 className="text-2xl font-bold text-gray-900">Transaction History</h2>
-                
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Search */}
-                  <div className="relative flex items-center">
-                    <Search 
-                      className="h-6 w-6 absolute top-1/2 transform -translate-y-1/2 text-gray-400 z-10" 
-                      style={{ left: '24px' }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search transactions..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pr-6 py-4 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-sm min-w-[260px] flex items-center"
-                      style={{ paddingLeft: '56px', backgroundImage: 'none' }}
-                    />
+              <div className="flex flex-col mb-8 gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h2 className="text-2xl font-bold text-gray-900">Transaction History</h2>
+                </div>
+
+                {/* Unified Modern Filter Section */}
+                <div 
+                  className="border border-gray-200 rounded-xl shadow-sm overflow-hidden"
+                  style={{ 
+                    backgroundColor: '#ffffff', 
+                    backgroundImage: 'none' 
+                  }}
+                >
+                  {/* Header */}
+                  <div 
+                    className="px-4 py-3 border-b border-gray-200"
+                    style={{ 
+                      backgroundColor: '#f8fafc', 
+                      backgroundImage: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)'
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-800 flex items-center">
+                        <Filter className="h-4 w-4 mr-2 text-gray-600" />
+                        Filters & Search
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSortBy('none');
+                          setDateRangeFrom('');
+                          setDateRangeTo('');
+                          setSpecificDate('');
+                          setAmountGreaterThan('');
+                          setAmountLessThan('');
+                          setFrequencyFilter('all');
+                          setDateFilterType('all');
+                          setFilter('all');
+                          setSearchTerm('');
+                        }}
+                        className="px-3 py-1 text-xs font-medium rounded-md transition-colors hover:shadow-sm"
+                        style={{ 
+                          backgroundColor: '#ef4444',
+                          color: '#ffffff',
+                          backgroundImage: 'none',
+                          border: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#dc2626';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ef4444';
+                        }}
+                      >
+                        Clear All
+                      </button>
+                    </div>
                   </div>
                   
-                  {/* Filter */}
-                  <div className="relative flex items-center">
-                    <Filter 
-                      className="h-6 w-6 absolute top-1/2 transform -translate-y-1/2 text-gray-400 z-10" 
-                      style={{ left: '24px' }}
-                    />
-                    <select
-                      value={filter}
-                      onChange={(e) => setFilter(e.target.value)}
-                      className="pr-12 py-4 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white shadow-sm min-w-[200px] flex items-center"
-                      style={{ paddingLeft: '56px', backgroundImage: 'none' }}
-                    >
-                      <option value="all">All Types</option>
-                      <option value="credit">Credit Only</option>
-                      <option value="debit">Debit Only</option>
-                    </select>
+                  {/* Main Filter Content - Flexible Column Layout */}
+                  <div 
+                    className="p-4"
+                    style={{ 
+                      backgroundColor: '#ffffff', 
+                      backgroundImage: 'none' 
+                    }}
+                  >
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                      
+                      {/* Column 1: Search & Basic Filters */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Search & Type</label>
+                          <div className="space-y-2">
+                            {/* Search */}
+                            <div className="relative">
+                              <Search 
+                                className="h-4 w-4 absolute text-gray-400 pointer-events-none" 
+                                style={{ 
+                                  left: '12px', 
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  zIndex: 10
+                                }} 
+                              />
+                              <input
+                                type="text"
+                                placeholder="Search transactions..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none',
+                                  paddingLeft: '36px'
+                                }}
+                              />
+                            </div>
+                            
+                            {/* Type & Frequency in same row */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value)}
+                                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none' 
+                                }}
+                              >
+                                <option value="all">All Types</option>
+                                <option value="credit">Credit</option>
+                                <option value="debit">Debit</option>
+                              </select>
+
+                              <select
+                                value={frequencyFilter}
+                                onChange={(e) => setFrequencyFilter(e.target.value as 'all' | 'regular' | 'irregular')}
+                                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none' 
+                                }}
+                              >
+                                <option value="all">All Freq.</option>
+                                <option value="regular">Regular</option>
+                                <option value="irregular">Irregular</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Sort Options - Compact Pills */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Sort Order</label>
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setSortBy('none')}
+                              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                sortBy === 'none'
+                                  ? 'text-white shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-800'
+                              }`}
+                              style={{ 
+                                backgroundColor: sortBy === 'none' ? '#f97316' : '#f3f4f6',
+                                backgroundImage: 'none'
+                              }}
+                            >
+                              None
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSortBy('newest')}
+                              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                sortBy === 'newest'
+                                  ? 'text-white shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-800'
+                              }`}
+                              style={{ 
+                                backgroundColor: sortBy === 'newest' ? '#f97316' : '#f3f4f6',
+                                backgroundImage: 'none'
+                              }}
+                            >
+                              ↓ Newest
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSortBy('oldest')}
+                              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                sortBy === 'oldest'
+                                  ? 'text-white shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-800'
+                              }`}
+                              style={{ 
+                                backgroundColor: sortBy === 'oldest' ? '#f97316' : '#f3f4f6',
+                                backgroundImage: 'none'
+                              }}
+                            >
+                              ↑ Oldest
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Column 2: Date Filters */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Date Filters</label>
+                          
+                          {/* Date Filter Type - Compact Pills */}
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <button
+                              type="button"
+                              onClick={() => setDateFilterType('all')}
+                              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                dateFilterType === 'all'
+                                  ? 'text-white shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-800'
+                              }`}
+                              style={{ 
+                                backgroundColor: dateFilterType === 'all' ? '#3b82f6' : '#f3f4f6',
+                                backgroundImage: 'none'
+                              }}
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDateFilterType('range')}
+                              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                dateFilterType === 'range'
+                                  ? 'text-white shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-800'
+                              }`}
+                              style={{ 
+                                backgroundColor: dateFilterType === 'range' ? '#3b82f6' : '#f3f4f6',
+                                backgroundImage: 'none'
+                              }}
+                            >
+                              📅 Range
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDateFilterType('specific')}
+                              className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                dateFilterType === 'specific'
+                                  ? 'text-white shadow-sm'
+                                  : 'text-gray-600 hover:text-gray-800'
+                              }`}
+                              style={{ 
+                                backgroundColor: dateFilterType === 'specific' ? '#3b82f6' : '#f3f4f6',
+                                backgroundImage: 'none'
+                              }}
+                            >
+                              📍 Specific
+                            </button>
+                          </div>
+
+                          {/* Date Inputs - Compact */}
+                          {dateFilterType === 'range' && (
+                            <div className="space-y-2 animate-fadeIn">
+                              <input
+                                type="date"
+                                value={dateRangeFrom}
+                                onChange={(e) => setDateRangeFrom(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none' 
+                                }}
+                                placeholder="From date"
+                              />
+                              <input
+                                type="date"
+                                value={dateRangeTo}
+                                onChange={(e) => setDateRangeTo(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none' 
+                                }}
+                                placeholder="To date"
+                              />
+                            </div>
+                          )}
+
+                          {dateFilterType === 'specific' && (
+                            <div className="animate-fadeIn">
+                              <input
+                                type="date"
+                                value={specificDate}
+                                onChange={(e) => setSpecificDate(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none' 
+                                }}
+                                placeholder="Select specific date"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Column 3: Amount Filters */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Amount Range</label>
+                          <div className="space-y-2">
+                            <div className="relative">
+                              <DollarSign 
+                                className="h-4 w-4 absolute text-gray-400 pointer-events-none" 
+                                style={{ 
+                                  left: '12px', 
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  zIndex: 10
+                                }} 
+                              />
+                              <input
+                                type="number"
+                                placeholder="Min amount"
+                                value={amountGreaterThan}
+                                onChange={(e) => setAmountGreaterThan(e.target.value)}
+                                step="0.01"
+                                min="0"
+                                className="w-full pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none',
+                                  paddingLeft: '36px'
+                                }}
+                              />
+                            </div>
+                            <div className="relative">
+                              <DollarSign 
+                                className="h-4 w-4 absolute text-gray-400 pointer-events-none" 
+                                style={{ 
+                                  left: '12px', 
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  zIndex: 10
+                                }} 
+                              />
+                              <input
+                                type="number"
+                                placeholder="Max amount"
+                                value={amountLessThan}
+                                onChange={(e) => setAmountLessThan(e.target.value)}
+                                step="0.01"
+                                min="0"
+                                className="w-full pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                style={{ 
+                                  backgroundColor: '#ffffff', 
+                                  backgroundImage: 'none',
+                                  paddingLeft: '36px'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Filter Status Indicators */}
+                        <div className="pt-2">
+                          <div className="flex flex-wrap gap-1">
+                            {searchTerm && (
+                              <span 
+                                className="px-2 py-1 text-xs font-medium text-blue-700 rounded-full"
+                                style={{ 
+                                  backgroundColor: '#dbeafe', 
+                                  backgroundImage: 'none' 
+                                }}
+                              >
+                                🔍 Search: "{searchTerm.substring(0, 10)}{searchTerm.length > 10 ? '...' : ''}"
+                              </span>
+                            )}
+                            {filter !== 'all' && (
+                              <span 
+                                className="px-2 py-1 text-xs font-medium text-orange-700 rounded-full"
+                                style={{ 
+                                  backgroundColor: '#fed7aa', 
+                                  backgroundImage: 'none' 
+                                }}
+                              >
+                                {filter === 'credit' ? '💰 Credit' : '💸 Debit'}
+                              </span>
+                            )}
+                            {frequencyFilter !== 'all' && (
+                              <span 
+                                className="px-2 py-1 text-xs font-medium text-purple-700 rounded-full"
+                                style={{ 
+                                  backgroundColor: '#e9d5ff', 
+                                  backgroundImage: 'none' 
+                                }}
+                              >
+                                📊 {frequencyFilter}
+                              </span>
+                            )}
+                            {(amountGreaterThan || amountLessThan) && (
+                              <span 
+                                className="px-2 py-1 text-xs font-medium text-green-700 rounded-full"
+                                style={{ 
+                                  backgroundColor: '#dcfce7', 
+                                  backgroundImage: 'none' 
+                                }}
+                              >
+                                💵 Amount Filter
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
                 </div>
               </div>
