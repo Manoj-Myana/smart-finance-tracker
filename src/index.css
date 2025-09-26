@@ -20,6 +20,24 @@ code {
     monospace;
 }
 
+/* Fix button cursor issues */
+button[type="submit"] {
+  cursor: pointer !important;
+}
+
+button[type="submit"]:disabled {
+  cursor: not-allowed !important;
+}
+
+/* Fix link cursor issues for branding text */
+a[style*="cursor: default"] {
+  cursor: default !important;
+}
+
+a[style*="cursor: default"]:hover {
+  cursor: default !important;
+}
+
 /* Utility classes to replace basic Tailwind functionality */
 .bg-white { background-color: white; }
 .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
