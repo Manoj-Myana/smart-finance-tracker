@@ -14,11 +14,17 @@ function AppContent() {
   const location = useLocation();
   const isHomePage = location.pathname === '/';
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
+  const isDashboardOrRelatedPage = location.pathname.startsWith('/dashboard') || 
+                                   location.pathname.startsWith('/transactions') || 
+                                   location.pathname.startsWith('/analytics') || 
+                                   location.pathname.startsWith('/budgets') || 
+                                   location.pathname.startsWith('/goals') || 
+                                   location.pathname.startsWith('/settings');
 
   return (
     <div className="min-h-screen bg-gray-50">
       {!isAuthPage && (
-        isHomePage ? <HomeNavbar isHomePage={true} /> : <Navbar />
+        (isHomePage || isDashboardOrRelatedPage) ? <HomeNavbar isHomePage={isHomePage} /> : <Navbar />
       )}
       
       {(isHomePage || isAuthPage) ? (
