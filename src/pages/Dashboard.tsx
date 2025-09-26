@@ -1,6 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, TrendingUp, TrendingDown, CreditCard, DollarSign } from 'lucide-react';
+import { 
+  PlusCircle, 
+  TrendingUp, 
+  TrendingDown, 
+  CreditCard, 
+  DollarSign, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  Eye,
+  Calendar,
+  Target,
+  PieChart,
+  Activity,
+  Wallet,
+  Star,
+  Bell
+} from 'lucide-react';
 
 interface UserType {
   id: number;
@@ -36,131 +52,329 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-100 to-indigo-200 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-pulse"></div>
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+          </div>
+          <p className="text-gray-600 mt-4 font-medium">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-100 to-indigo-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {user?.fullName}! 👋
-          </h1>
-          <p className="text-gray-600">
-            Here's an overview of your financial dashboard
-          </p>
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                Welcome back, <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">{user?.fullName?.split(' ')[0]}</span>! 👋
+              </h1>
+              <p className="text-gray-700 text-lg font-medium">
+                Here's what's happening with your money today
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Balance</p>
-                <p className="text-2xl font-bold text-gray-900">$0.00</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-xl">
+          {/* Total Balance Card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-green-50 rounded-xl">
                 <DollarSign className="h-6 w-6 text-green-600" />
               </div>
+              <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                <ArrowUpRight className="h-3 w-3" />
+                <span className="text-xs font-semibold">+12.5%</span>
+              </div>
             </div>
+            <p className="text-gray-600 text-sm font-medium mb-1">Total Balance</p>
+            <p className="text-3xl font-bold text-gray-900">$24,500.00</p>
+            <p className="text-xs text-gray-500 mt-1">All accounts combined</p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Monthly Income</p>
-                <p className="text-2xl font-bold text-gray-900">$0.00</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-xl">
+          {/* Monthly Income Card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-blue-50 rounded-xl">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
               </div>
+              <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                <ArrowUpRight className="h-3 w-3" />
+                <span className="text-xs font-semibold">+8.2%</span>
+              </div>
             </div>
+            <p className="text-gray-600 text-sm font-medium mb-1">Monthly Income</p>
+            <p className="text-3xl font-bold text-gray-900">$8,200.00</p>
+            <p className="text-xs text-gray-500 mt-1">From 3 sources</p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Monthly Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">$0.00</p>
-              </div>
-              <div className="p-3 bg-red-100 rounded-xl">
+          {/* Monthly Expenses Card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-red-50 rounded-xl">
                 <TrendingDown className="h-6 w-6 text-red-600" />
               </div>
+              <div className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded-full">
+                <ArrowDownRight className="h-3 w-3" />
+                <span className="text-xs font-semibold">-3.1%</span>
+              </div>
             </div>
+            <p className="text-gray-600 text-sm font-medium mb-1">Monthly Expenses</p>
+            <p className="text-3xl font-bold text-gray-900">$3,750.00</p>
+            <p className="text-xs text-gray-500 mt-1">Across 12 categories</p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Accounts</p>
-                <p className="text-2xl font-bold text-gray-900">0</p>
+          {/* Savings Goal Card */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:bg-white/90 transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-purple-50 rounded-xl">
+                <Target className="h-6 w-6 text-purple-600" />
               </div>
-              <div className="p-3 bg-purple-100 rounded-xl">
-                <CreditCard className="h-6 w-6 text-purple-600" />
+              <div className="flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                <span className="text-xs font-semibold">73%</span>
               </div>
+            </div>
+            <p className="text-gray-600 text-sm font-medium mb-1">Savings Goal</p>
+            <p className="text-3xl font-bold text-gray-900">$7,300</p>
+            <div className="mt-3">
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-purple-600 h-2 rounded-full w-3/4 transition-all"></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">$2,700 to go</p>
             </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <button className="flex flex-col items-center p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg">
-                <PlusCircle className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium">Add Account</span>
-              </button>
-              <button className="flex flex-col items-center p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg">
-                <TrendingUp className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium">Add Income</span>
-              </button>
-              <button className="flex flex-col items-center p-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg">
-                <TrendingDown className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium">Add Expense</span>
-              </button>
-              <button className="flex flex-col items-center p-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg">
-                <CreditCard className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium">Transfer</span>
-              </button>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Quick Actions */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Quick Actions</h3>
+                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline">View All</button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button className="group flex flex-col items-center p-4 bg-gradient-to-br from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform">
+                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
+                    <Wallet className="h-6 w-6" />
+                  </div>
+                  <span className="text-sm font-semibold">Add Account</span>
+                </button>
+                
+                <button 
+                  className="group flex flex-col items-center p-4 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform"
+                  style={{
+                    background: 'linear-gradient(to bottom right, #22c55e, #059669)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to bottom right, #16a34a, #047857)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to bottom right, #22c55e, #059669)';
+                  }}
+                >
+                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
+                    <TrendingUp className="h-6 w-6" />
+                  </div>
+                  <span className="text-sm font-semibold">Add Income</span>
+                </button>
+                
+                <button className="group flex flex-col items-center p-4 bg-gradient-to-br from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform">
+                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
+                    <TrendingDown className="h-6 w-6" />
+                  </div>
+                  <span className="text-sm font-semibold">Add Expense</span>
+                </button>
+                
+                <button className="group flex flex-col items-center p-4 bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform">
+                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
+                    <CreditCard className="h-6 w-6" />
+                  </div>
+                  <span className="text-sm font-semibold">Transfer</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Recent Transactions */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Recent Transactions</h3>
+                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline">View All</button>
+              </div>
+              <div className="space-y-4">
+                {/* Sample Transaction Items */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-green-100 rounded-xl">
+                      <ArrowUpRight className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Salary Deposit</p>
+                      <p className="text-sm text-gray-500">Today, 2:30 PM</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-green-600">+$4,200.00</p>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 rounded-xl">
+                      <CreditCard className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Online Shopping</p>
+                      <p className="text-sm text-gray-500">Yesterday, 6:45 PM</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-red-600">-$145.99</p>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-orange-100 rounded-xl">
+                      <Activity className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Grocery Store</p>
+                      <p className="text-sm text-gray-500">2 days ago, 10:15 AM</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-red-600">-$87.32</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Activity</h3>
-            <div className="text-center text-gray-500 py-8">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="h-8 w-8 text-gray-400" />
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Account Overview */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-gray-900">Accounts</h3>
+                <Eye className="h-5 w-5 text-gray-400" />
               </div>
-              <p className="text-sm">No recent transactions</p>
-              <p className="text-xs text-gray-400">Start by adding your first account or transaction</p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-600 rounded-lg">
+                      <Wallet className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Main Checking</p>
+                      <p className="text-xs text-gray-500">**** 4532</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-gray-900">$18,500</p>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-600 rounded-lg">
+                      <Star className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Savings</p>
+                      <p className="text-xs text-gray-500">**** 7891</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-gray-900">$6,000</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly Goals */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-gray-900">Monthly Goals</h3>
+                <PieChart className="h-5 w-5 text-gray-400" />
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">Savings</span>
+                    <span className="text-sm font-bold text-gray-900">73%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full w-3/4 transition-all"></div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">Budget</span>
+                    <span className="text-sm font-bold text-gray-900">45%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-600 h-2 rounded-full w-2/5 transition-all"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Upcoming */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Upcoming</h3>
+                <Calendar className="h-5 w-5 text-gray-400" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900">Rent Payment</p>
+                    <p className="text-xs text-gray-500">Due in 3 days</p>
+                  </div>
+                  <p className="text-sm font-bold text-gray-900">$1,200</p>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900">Credit Card</p>
+                    <p className="text-xs text-gray-500">Due in 8 days</p>
+                  </div>
+                  <p className="text-sm font-bold text-gray-900">$450</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Getting Started Section */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">🎉 Welcome to Smart Finance Tracker!</h2>
-            <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
-              You've successfully created your account! Start managing your finances by adding your first account, 
-              tracking income and expenses, and getting insights into your financial health.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <button className="px-6 py-3 bg-white/20 backdrop-blur-sm rounded-xl hover:bg-white/30 transition-all transform hover:scale-105 border border-white/20">
-                View Tutorial
-              </button>
-              <button className="px-6 py-3 bg-white text-blue-600 rounded-xl hover:bg-blue-50 transition-all transform hover:scale-105 font-semibold">
-                Add First Account
-              </button>
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl shadow-2xl p-8 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mt-16 -mr-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -mb-12 -ml-12"></div>
+          <div className="relative z-10">
+            <div className="text-center max-w-4xl mx-auto">
+              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
+                <Star className="h-4 w-4" />
+                <span className="text-sm font-semibold">Welcome to Smart Finance Tracker</span>
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Take control of your financial future
+              </h2>
+              <p className="text-indigo-100 mb-8 text-lg max-w-2xl mx-auto leading-relaxed">
+                You've successfully created your account! Start your journey to financial freedom by tracking your 
+                income, expenses, and setting achievable savings goals.
+              </p>
+              <div className="flex flex-wrap justify-center gap-4">
+                <button className="px-8 py-4 bg-white/20 backdrop-blur-sm rounded-2xl hover:bg-white/30 transition-all transform hover:scale-105 border border-white/20 font-semibold">
+                  📚 View Tutorial
+                </button>
+                <button className="px-8 py-4 bg-white text-indigo-600 rounded-2xl hover:bg-indigo-50 transition-all transform hover:scale-105 font-bold shadow-lg">
+                  🚀 Get Started
+                </button>
+              </div>
             </div>
           </div>
         </div>

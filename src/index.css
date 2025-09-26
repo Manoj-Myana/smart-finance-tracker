@@ -21,11 +21,19 @@ code {
 }
 
 /* Fix button cursor issues */
+button {
+  cursor: pointer !important;
+}
+
 button[type="submit"] {
   cursor: pointer !important;
 }
 
 button[type="submit"]:disabled {
+  cursor: not-allowed !important;
+}
+
+button:disabled {
   cursor: not-allowed !important;
 }
 

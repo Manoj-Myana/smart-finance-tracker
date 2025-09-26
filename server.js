@@ -47,7 +47,7 @@ db.serialize(() => {
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
 app.use(express.json());
@@ -322,7 +322,7 @@ app.use((error, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Smart Finance Tracker API running on http://localhost:${PORT}`);
   console.log(`📊 Database initialized and ready`);
-  console.log(`🌐 CORS enabled for http://localhost:3000`);
+  console.log(`🌐 CORS enabled for http://localhost:3000 and http://localhost:3001`);
 });
 
 module.exports = app;
