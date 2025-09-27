@@ -385,5 +385,5 @@ if __name__ == "__main__":
     # Create upload directory
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     
-    # Run the Flask app
-    app.run(debug=True, port=5000)
+    # Run the Flask app on port 5001
+    app.run(debug=True, port=5001)

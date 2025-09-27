@@ -69,10 +69,16 @@ const Reports: React.FC = () => {
   // Function to fetch existing transactions from the database
   const fetchExistingTransactions = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/transactions/1'); // Assuming user_id = 1
+      const userId = localStorage.getItem('userId') || '1';
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5001/api/transactions/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
-        setExistingTransactions(data);
+        setExistingTransactions(data || []);
       } else {
         console.error('Failed to fetch existing transactions');
       }
@@ -169,7 +175,7 @@ const Reports: React.FC = () => {
       const formData = new FormData();
       formData.append('file', pdfFile);
       
-      // Send file to Flask backend for processing
+      // Send file to Node.js backend for processing (temporary fix)
       const response = await fetch('http://localhost:5001/api/upload', {
         method: 'POST',
         body: formData,
@@ -490,11 +496,10 @@ const Reports: React.FC = () => {
 
       console.log('Merging transactions:', transactionsForAPI);
 
-      // Use batch endpoint for better performance
-      const response = await fetch('http://localhost:5001/api/transactions/batch', {
+      // Use POST endpoint for transactions
+      const response = await fetch('http://localhost:5000/api/transactions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ transactions: transactionsForAPI }),
@@ -532,19 +537,41 @@ const Reports: React.FC = () => {
   if (loading) {
     return (
       <div 
-        className="min-h-screen flex items-center justify-center"
         style={{
           background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0, #cbd5e1)',
           backgroundAttachment: 'fixed',
-          minHeight: '100vh'
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
       >
-        <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-gray-600 rounded-full animate-pulse"></div>
-            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              border: '4px solid #4b5563',
+              borderRadius: '50%',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }}></div>
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              width: '64px',
+              height: '64px',
+              border: '4px solid #3b82f6',
+              borderTop: '4px solid transparent',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }}></div>
           </div>
-          <p className="text-gray-600 mt-4 font-medium">Loading upload page...</p>
+          <p style={{
+            color: '#4b5563',
+            marginTop: '16px',
+            fontWeight: '500'
+          }}>Loading upload page...</p>
         </div>
       </div>
     );
@@ -558,10 +585,13 @@ const Reports: React.FC = () => {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
           }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
         `}
       </style>
       <div 
-        className="min-h-screen"
         style={{
           background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0, #cbd5e1)',
           backgroundAttachment: 'fixed',
@@ -571,15 +601,15 @@ const Reports: React.FC = () => {
           zIndex: 1
         }}
       >
-      <main style={{ 
-        maxWidth: '1280px', 
-        marginLeft: 'auto', 
-        marginRight: 'auto', 
-        paddingLeft: '16px', 
-        paddingRight: '16px', 
-        paddingTop: '24px', 
-        paddingBottom: '24px' 
-      }}>
+        <main style={{ 
+          maxWidth: '1280px', 
+          marginLeft: 'auto', 
+          marginRight: 'auto', 
+          paddingLeft: '16px', 
+          paddingRight: '16px', 
+          paddingTop: '24px', 
+          paddingBottom: '24px' 
+        }}>
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ 
@@ -845,18 +875,49 @@ const Reports: React.FC = () => {
                 setExcelDragOver(true);
               }}
               onDragLeave={() => setExcelDragOver(false)}
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-                excelDragOver
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-green-300 hover:border-green-400 hover:bg-green-50/50'
-              }`}
-              style={{ backgroundImage: 'none' }}
+              style={{
+                border: '2px dashed',
+                borderColor: excelDragOver ? '#22c55e' : '#86efac',
+                backgroundColor: excelDragOver ? '#f0fdf4' : 'rgba(240, 253, 244, 0.5)',
+                borderRadius: '12px',
+                padding: '32px',
+                textAlign: 'center',
+                transition: 'all 0.3s ease',
+                backgroundImage: 'none',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                if (!excelDragOver) {
+                  e.currentTarget.style.borderColor = '#4ade80';
+                  e.currentTarget.style.backgroundColor = 'rgba(240, 253, 244, 0.7)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!excelDragOver) {
+                  e.currentTarget.style.borderColor = '#86efac';
+                  e.currentTarget.style.backgroundColor = 'rgba(240, 253, 244, 0.5)';
+                }
+              }}
             >
-              <Upload className="h-12 w-12 text-green-400 mx-auto mb-4" />
-              <p className="text-lg font-semibold text-gray-700 mb-2">
+              <Upload style={{ 
+                height: '48px', 
+                width: '48px', 
+                color: '#4ade80', 
+                margin: '0 auto 16px auto' 
+              }} />
+              <p style={{ 
+                fontSize: '18px', 
+                fontWeight: '600', 
+                color: '#374151', 
+                marginBottom: '8px' 
+              }}>
                 Drop Excel/CSV files here or click to browse
               </p>
-              <p className="text-sm text-gray-500 mb-4">
+              <p style={{ 
+                fontSize: '14px', 
+                color: '#6b7280', 
+                marginBottom: '16px' 
+              }}>
                 Supports .xlsx, .xls, and .csv files up to 10MB
               </p>
               
@@ -868,13 +929,35 @@ const Reports: React.FC = () => {
                     handleExcelUpload(e.target.files[0]);
                   }
                 }}
-                className="hidden"
+                style={{ display: 'none' }}
                 id="excel-upload"
               />
               
               <label
                 htmlFor="excel-upload"
-                className="inline-block px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg cursor-pointer transition-all transform hover:scale-105 shadow-lg"
+                style={{
+                  display: 'inline-block',
+                  paddingLeft: '24px',
+                  paddingRight: '24px',
+                  paddingTop: '12px',
+                  paddingBottom: '12px',
+                  background: 'linear-gradient(to right, #22c55e, #16a34a)',
+                  color: 'white',
+                  fontWeight: '600',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  transform: 'scale(1)',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #15803d)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #16a34a)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
               >
                 Browse Excel/CSV Files
               </label>
@@ -883,40 +966,91 @@ const Reports: React.FC = () => {
             {/* Excel File Preview */}
             {excelFile && (
               <div 
-                className="mt-6 p-4 bg-white rounded-lg border border-green-200"
-                style={{ backgroundImage: 'none' }}
+                style={{ 
+                  marginTop: '24px', 
+                  padding: '16px', 
+                  backgroundColor: 'white', 
+                  borderRadius: '8px', 
+                  border: '1px solid #dcfce7',
+                  backgroundImage: 'none' 
+                }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <File className="h-6 w-6 text-green-600" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <File style={{ height: '24px', width: '24px', color: '#16a34a' }} />
                     <div>
-                      <p className="font-semibold text-gray-900">{excelFile.name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p style={{ fontWeight: '600', color: '#111827' }}>{excelFile.name}</p>
+                      <p style={{ fontSize: '14px', color: '#6b7280' }}>
                         {(excelFile.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => setExcelFile(null)}
-                    className="p-2 text-gray-400 hover:text-green-500 transition-colors"
+                    style={{ 
+                      padding: '8px', 
+                      color: '#9ca3af', 
+                      transition: 'color 0.3s ease',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#22c55e'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
                   >
-                    <X className="h-5 w-5" />
+                    <X style={{ height: '20px', width: '20px' }} />
                   </button>
                 </div>
                 
                 <button
                   onClick={processExcelFile}
                   disabled={excelUploading}
-                  className="w-full mt-4 flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    width: '100%',
+                    marginTop: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    paddingLeft: '16px',
+                    paddingRight: '16px',
+                    paddingTop: '12px',
+                    paddingBottom: '12px',
+                    background: excelUploading ? 'rgba(34, 197, 94, 0.5)' : 'linear-gradient(to right, #22c55e, #16a34a)',
+                    color: 'white',
+                    fontWeight: '600',
+                    borderRadius: '8px',
+                    transition: 'all 0.3s ease',
+                    opacity: excelUploading ? '0.5' : '1',
+                    cursor: excelUploading ? 'not-allowed' : 'pointer',
+                    border: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!excelUploading) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #15803d)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!excelUploading) {
+                      e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #16a34a)';
+                    }
+                  }}
                 >
                   {excelUploading ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        border: '2px solid white',
+                        borderTop: '2px solid transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }}></div>
                       <span>Processing...</span>
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-5 w-5" />
+                      <CheckCircle style={{ height: '20px', width: '20px' }} />
                       <span>Process Excel Statement</span>
                     </>
                   )}
@@ -928,41 +1062,55 @@ const Reports: React.FC = () => {
 
         {/* Instructions */}
         <div 
-          className="mt-8 p-6 rounded-2xl shadow-lg border border-blue-100/50"
           style={{
+            marginTop: '32px',
+            padding: '24px',
+            borderRadius: '16px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            border: '1px solid rgba(219, 234, 254, 0.5)',
             backgroundColor: 'rgba(239, 246, 255, 0.9)',
             backgroundImage: 'none'
           }}
         >
-          <div className="flex items-center gap-3 mb-4">
-            <AlertCircle className="h-6 w-6 text-blue-600" />
-            <h3 className="text-xl font-bold text-gray-900">Upload Instructions</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <AlertCircle style={{ height: '24px', width: '24px', color: '#2563eb' }} />
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>Upload Instructions</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+            gap: '24px' 
+          }}>
             <div>
-              <h4 className="font-semibold text-gray-800 mb-2">📄 PDF Bank Statements</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Download official PDF statements from your bank</li>
-                <li>• Ensure the PDF contains transaction details</li>
-                <li>• Maximum file size: 10MB</li>
-                <li>• AI will extract transaction data automatically</li>
+              <h4 style={{ fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>📄 PDF Bank Statements</h4>
+              <ul style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.5' }}>
+                <li style={{ marginBottom: '4px' }}>Download official PDF statements from your bank</li>
+                <li style={{ marginBottom: '4px' }}>Ensure the PDF contains transaction details</li>
+                <li style={{ marginBottom: '4px' }}>Maximum file size: 10MB</li>
+                <li style={{ marginBottom: '4px' }}>AI will extract transaction data automatically</li>
               </ul>
             </div>
             
             <div>
-              <h4 className="font-semibold text-gray-800 mb-2">📊 Excel/CSV Bank Statements</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Export transaction data as Excel or CSV</li>
-                <li>• Include columns: Date, Description, Amount, Type</li>
-                <li>• Maximum file size: 10MB</li>
-                <li>• Data will be imported directly to your account</li>
+              <h4 style={{ fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>📊 Excel/CSV Bank Statements</h4>
+              <ul style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.5' }}>
+                <li style={{ marginBottom: '4px' }}>Export transaction data as Excel or CSV</li>
+                <li style={{ marginBottom: '4px' }}>Include columns: Date, Description, Amount, Type</li>
+                <li style={{ marginBottom: '4px' }}>Maximum file size: 10MB</li>
+                <li style={{ marginBottom: '4px' }}>Data will be imported directly to your account</li>
               </ul>
             </div>
           </div>
           
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
+          <div style={{ 
+            marginTop: '16px', 
+            padding: '16px', 
+            backgroundColor: '#fefce8', 
+            border: '1px solid #fde047', 
+            borderRadius: '8px' 
+          }}>
+            <p style={{ fontSize: '14px', color: '#a16207' }}>
               <strong>Note:</strong> This feature is currently in development. Uploaded files will be processed 
               and transactions will be automatically added to your account. Please ensure your bank statements 
               don't contain sensitive information beyond transaction data.
@@ -973,48 +1121,81 @@ const Reports: React.FC = () => {
         {/* Extracted Transactions Table */}
         {showExtractedTransactions && extractedTransactions.length > 0 && (
           <div 
-            className="mt-8 p-6 rounded-2xl shadow-lg border border-orange-100/50"
             style={{
+              marginTop: '32px',
+              padding: '24px',
+              borderRadius: '16px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              border: '1px solid rgba(254, 215, 170, 0.5)',
               backgroundColor: 'rgba(255, 247, 237, 0.9)',
               backgroundImage: 'none'
             }}
           >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-900">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827' }}>
                 Extracted Transactions ({extractedTransactions.length} found)
               </h3>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <AlertCircle className="h-4 w-4" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#4b5563' }}>
+                <AlertCircle style={{ height: '16px', width: '16px' }} />
                 <span>Review before merging</span>
               </div>
             </div>
 
             {/* Transactions Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+            <div style={{ 
+              backgroundColor: 'white', 
+              borderRadius: '12px', 
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', 
+              border: '1px solid #f3f4f6', 
+              overflow: 'hidden', 
+              marginBottom: '24px' 
+            }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%' }}>
+                  <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                     <tr>
-                      <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Date</th>
-                      <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Description</th>
-                      <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Type</th>
-                      <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Frequency</th>
-                      <th className="text-right py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Amount</th>
-                      <th className="text-center py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Actions</th>
+                      <th style={{ textAlign: 'left', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
+                      <th style={{ textAlign: 'left', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</th>
+                      <th style={{ textAlign: 'left', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
+                      <th style={{ textAlign: 'left', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Frequency</th>
+                      <th style={{ textAlign: 'right', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount</th>
+                      <th style={{ textAlign: 'center', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody style={{ borderTop: '1px solid #f3f4f6' }}>
                     {extractedTransactions.map((transaction, index) => (
-                      <tr key={transaction.id} className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                      <tr 
+                        key={transaction.id} 
+                        style={{
+                          backgroundColor: index % 2 === 0 ? 'white' : 'rgba(249, 250, 251, 0.3)',
+                          transition: 'background-color 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : 'rgba(249, 250, 251, 0.3)'}
+                      >
                         {/* Date Column */}
-                        <td className="py-6 px-6 text-base text-gray-600 font-medium">
+                        <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px', fontSize: '16px', color: '#4b5563', fontWeight: '500' }}>
                           {editingTransaction === transaction.id ? (
                             <input
                               type="date"
                               value={editFormData.date || transaction.date}
                               onChange={(e) => handleEditFormChange('date', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              style={{ backgroundColor: 'white' }}
+                              style={{ 
+                                width: '100%', 
+                                padding: '8px 12px', 
+                                border: '1px solid #d1d5db', 
+                                borderRadius: '8px', 
+                                backgroundColor: 'white',
+                                outline: 'none'
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#3b82f6';
+                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.2)';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
                             />
                           ) : (
                             new Date(transaction.date).toLocaleDateString('en-US', {
@@ -1026,18 +1207,39 @@ const Reports: React.FC = () => {
                         </td>
                         
                         {/* Description Column */}
-                        <td className="py-6 px-6">
-                          <div className="max-w-xs">
+                        <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px' }}>
+                          <div style={{ maxWidth: '300px' }}>
                             {editingTransaction === transaction.id ? (
                               <input
                                 type="text"
                                 value={editFormData.description || transaction.description}
                                 onChange={(e) => handleEditFormChange('description', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                style={{ backgroundColor: 'white' }}
+                                style={{ 
+                                  width: '100%', 
+                                  padding: '8px 12px', 
+                                  border: '1px solid #d1d5db', 
+                                  borderRadius: '8px', 
+                                  backgroundColor: 'white',
+                                  outline: 'none'
+                                }}
+                                onFocus={(e) => {
+                                  e.currentTarget.style.borderColor = '#3b82f6';
+                                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.2)';
+                                }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.borderColor = '#d1d5db';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }}
                               />
                             ) : (
-                              <p className="text-lg font-medium text-gray-900 truncate">
+                              <p style={{ 
+                                fontSize: '18px', 
+                                fontWeight: '500', 
+                                color: '#111827', 
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
                                 {transaction.description}
                               </p>
                             )}
@@ -1045,27 +1247,50 @@ const Reports: React.FC = () => {
                         </td>
                         
                         {/* Type Column */}
-                        <td className="py-6 px-6">
+                        <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px' }}>
                           {editingTransaction === transaction.id ? (
                             <select
                               value={editFormData.type || transaction.type}
                               onChange={(e) => handleEditFormChange('type', e.target.value as 'credit' | 'debit')}
-                              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              style={{ backgroundColor: 'white' }}
+                              style={{ 
+                                padding: '8px 12px', 
+                                border: '1px solid #d1d5db', 
+                                borderRadius: '8px', 
+                                backgroundColor: 'white',
+                                outline: 'none'
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#3b82f6';
+                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.2)';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
                             >
                               <option value="credit">Credit</option>
                               <option value="debit">Debit</option>
                             </select>
                           ) : (
-                            <span className={`inline-flex items-center px-4 py-2 rounded-full text-base font-medium ${
-                              transaction.type === 'credit' 
-                                ? 'bg-green-100 text-green-700 border border-green-200' 
-                                : 'bg-red-100 text-red-700 border border-red-200'
-                            }`}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              paddingLeft: '16px',
+                              paddingRight: '16px',
+                              paddingTop: '8px',
+                              paddingBottom: '8px',
+                              borderRadius: '50px',
+                              fontSize: '16px',
+                              fontWeight: '500',
+                              border: '1px solid',
+                              backgroundColor: transaction.type === 'credit' ? '#dcfce7' : '#fef2f2',
+                              color: transaction.type === 'credit' ? '#166534' : '#991b1b',
+                              borderColor: transaction.type === 'credit' ? '#bbf7d0' : '#fecaca'
+                            }}>
                               {transaction.type === 'credit' ? (
-                                <TrendingUp className="h-5 w-5 mr-2" />
+                                <TrendingUp style={{ height: '20px', width: '20px', marginRight: '8px' }} />
                               ) : (
-                                <TrendingDown className="h-5 w-5 mr-2" />
+                                <TrendingDown style={{ height: '20px', width: '20px', marginRight: '8px' }} />
                               )}
                               {transaction.type}
                             </span>
@@ -1073,26 +1298,52 @@ const Reports: React.FC = () => {
                         </td>
                         
                         {/* Frequency Column */}
-                        <td className="py-6 px-6">
+                        <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px' }}>
                           {editingTransaction === transaction.id ? (
                             <select
                               value={editFormData.frequency || transaction.frequency}
                               onChange={(e) => handleEditFormChange('frequency', e.target.value as 'regular' | 'irregular')}
-                              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              style={{ backgroundColor: 'white' }}
+                              style={{ 
+                                padding: '8px 12px', 
+                                border: '1px solid #d1d5db', 
+                                borderRadius: '8px', 
+                                backgroundColor: 'white',
+                                outline: 'none'
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#3b82f6';
+                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.2)';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
                             >
                               <option value="regular">Regular</option>
                               <option value="irregular">Irregular</option>
                             </select>
                           ) : (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              paddingLeft: '12px',
+                              paddingRight: '12px',
+                              paddingTop: '4px',
+                              paddingBottom: '4px',
+                              borderRadius: '50px',
+                              fontSize: '14px',
+                              fontWeight: '500',
+                              backgroundColor: '#dbeafe',
+                              color: '#1d4ed8',
+                              border: '1px solid #bfdbfe'
+                            }}>
                               {transaction.frequency}
                             </span>
                           )}
                         </td>
                         
                         {/* Amount Column */}
-                        <td className="py-6 px-6 text-right">
+                        <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px', textAlign: 'right' }}>
                           {editingTransaction === transaction.id ? (
                             <input
                               type="number"
@@ -1100,52 +1351,129 @@ const Reports: React.FC = () => {
                               min="0"
                               value={editFormData.amount || transaction.amount}
                               onChange={(e) => handleEditFormChange('amount', parseFloat(e.target.value))}
-                              className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
-                              style={{ backgroundColor: 'white' }}
+                              style={{ 
+                                width: '128px', 
+                                padding: '8px 12px', 
+                                border: '1px solid #d1d5db', 
+                                borderRadius: '8px', 
+                                textAlign: 'right', 
+                                backgroundColor: 'white',
+                                outline: 'none'
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#3b82f6';
+                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.2)';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
                             />
                           ) : (
-                            <span className={`text-lg font-bold ${
-                              transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
-                            }`}>
+                            <span style={{
+                              fontSize: '18px',
+                              fontWeight: 'bold',
+                              color: transaction.type === 'credit' ? '#059669' : '#dc2626'
+                            }}>
                               ${transaction.amount.toFixed(2)}
                             </span>
                           )}
                         </td>
                         
                         {/* Actions Column */}
-                        <td className="py-6 px-6 text-center">
+                        <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px', textAlign: 'center' }}>
                           {editingTransaction === transaction.id ? (
-                            <div className="flex items-center justify-center gap-2">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                               <button
                                 onClick={handleSaveEdit}
-                                className="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  paddingLeft: '12px',
+                                  paddingRight: '12px',
+                                  paddingTop: '4px',
+                                  paddingBottom: '4px',
+                                  backgroundColor: '#059669',
+                                  color: 'white',
+                                  borderRadius: '8px',
+                                  transition: 'background-color 0.2s ease',
+                                  border: 'none',
+                                  cursor: 'pointer'
+                                }}
                                 title="Save changes"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#047857'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#059669'}
                               >
-                                <Save className="h-4 w-4" />
+                                <Save style={{ height: '16px', width: '16px' }} />
                               </button>
                               <button
                                 onClick={handleCancelEdit}
-                                className="inline-flex items-center px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  paddingLeft: '12px',
+                                  paddingRight: '12px',
+                                  paddingTop: '4px',
+                                  paddingBottom: '4px',
+                                  backgroundColor: '#6b7280',
+                                  color: 'white',
+                                  borderRadius: '8px',
+                                  transition: 'background-color 0.2s ease',
+                                  border: 'none',
+                                  cursor: 'pointer'
+                                }}
                                 title="Cancel editing"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4b5563'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6b7280'}
                               >
-                                <XCircle className="h-4 w-4" />
+                                <XCircle style={{ height: '16px', width: '16px' }} />
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center gap-2">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                               <button
                                 onClick={() => handleEditTransaction(transaction)}
-                                className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  paddingLeft: '12px',
+                                  paddingRight: '12px',
+                                  paddingTop: '4px',
+                                  paddingBottom: '4px',
+                                  backgroundColor: '#2563eb',
+                                  color: 'white',
+                                  borderRadius: '8px',
+                                  transition: 'background-color 0.2s ease',
+                                  border: 'none',
+                                  cursor: 'pointer'
+                                }}
                                 title="Edit transaction"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
                               >
-                                <Edit2 className="h-4 w-4" />
+                                <Edit2 style={{ height: '16px', width: '16px' }} />
                               </button>
                               <button
                                 onClick={() => handleDeleteTransaction(transaction.id)}
-                                className="inline-flex items-center px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  paddingLeft: '12px',
+                                  paddingRight: '12px',
+                                  paddingTop: '4px',
+                                  paddingBottom: '4px',
+                                  backgroundColor: '#dc2626',
+                                  color: 'white',
+                                  borderRadius: '8px',
+                                  transition: 'background-color 0.2s ease',
+                                  border: 'none',
+                                  cursor: 'pointer'
+                                }}
                                 title="Delete transaction"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 style={{ height: '16px', width: '16px' }} />
                               </button>
                             </div>
                           )}
@@ -1158,28 +1486,74 @@ const Reports: React.FC = () => {
             </div>
 
             {/* Merge Button */}
-            <div className="flex justify-center">
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
                 onClick={mergeTransactions}
                 disabled={merging}
-                className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  paddingLeft: '32px',
+                  paddingRight: '32px',
+                  paddingTop: '16px',
+                  paddingBottom: '16px',
+                  background: merging ? 'rgba(34, 197, 94, 0.5)' : 'linear-gradient(to right, #22c55e, #16a34a)',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '18px',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.3s ease',
+                  transform: 'scale(1)',
+                  opacity: merging ? '0.5' : '1',
+                  cursor: merging ? 'not-allowed' : 'pointer',
+                  border: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!merging) {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #15803d)';
+                    e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!merging) {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #16a34a)';
+                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }
+                }}
               >
                 {merging ? (
                   <>
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      border: '2px solid white',
+                      borderTop: '2px solid transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }}></div>
                     <span>Merging Transactions...</span>
                   </>
                 ) : (
                   <>
-                    <ArrowRight className="h-6 w-6" />
+                    <ArrowRight style={{ height: '24px', width: '24px' }} />
                     <span>Merge {extractedTransactions.length} Transactions</span>
                   </>
                 )}
               </button>
             </div>
 
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800">
+            <div style={{ 
+              marginTop: '16px', 
+              padding: '16px', 
+              backgroundColor: '#eff6ff', 
+              borderRadius: '8px', 
+              border: '1px solid #bfdbfe' 
+            }}>
+              <p style={{ fontSize: '14px', color: '#1e40af' }}>
                 <strong>Review:</strong> Please review the extracted transactions above. All transactions are set to 
                 'irregular' frequency by default. Click "Merge Transactions" to add them to your account.
               </p>
