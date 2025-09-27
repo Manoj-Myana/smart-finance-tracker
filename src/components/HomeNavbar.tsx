@@ -111,6 +111,7 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
   // Dashboard navbar: Logo + navigation items (Dashboard link removed when logged in)
   const navItems = [
     { path: '/transactions', label: 'Transactions' },
+    { path: '/reports', label: 'PDF/Excel' },
     { path: '/analytics', label: 'Analytics' },
     { path: '/budgets', label: 'Budgets' },
     { path: '/goals', label: 'Goals' },
