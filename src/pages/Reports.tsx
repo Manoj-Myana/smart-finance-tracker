@@ -70,8 +70,8 @@ const Reports: React.FC = () => {
   const fetchExistingTransactions = async () => {
     try {
       const userId = localStorage.getItem('userId') || '1';
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5001/api/transactions/${userId}`, {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`http://localhost:5000/api/transactions/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -468,12 +468,43 @@ const Reports: React.FC = () => {
     if (!excelFile) return;
     
     setExcelUploading(true);
-    // Simulate processing time
-    setTimeout(() => {
+    
+    try {
+      console.log('Processing Excel with Flask backend:', excelFile.name, 'Size:', excelFile.size);
+      
+      // Create FormData to send file to backend
+      const formData = new FormData();
+      formData.append('file', excelFile);
+      
+      // Send file to Flask backend for processing (same as PDF)
+      const response = await fetch('http://localhost:5001/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Flask backend response:', result);
+      
+      if (result.success && result.transactions) {
+        console.log('Extracted transactions from Flask:', result.transactions);
+        setExtractedTransactions(result.transactions);
+        setShowExtractedTransactions(true);
+        alert(`Successfully extracted ${result.count} transactions from Excel file!`);
+      } else {
+        throw new Error('Invalid response from Flask backend');
+      }
+      
+    } catch (error) {
+      console.error('Error processing Excel file:', error);
+      alert(`Error processing Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
       setExcelUploading(false);
-      alert('Excel processing completed! Transactions will be added to your account.');
-      setExcelFile(null);
-    }, 3000);
+    }
   };
 
   const mergeTransactions = async () => {
@@ -501,6 +532,7 @@ const Reports: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ transactions: transactionsForAPI }),
       });

@@ -1,0 +1,6 @@
+Date,Description,Amount,Type,Category
+2024-01-01,Salary Deposit,5000.00,Credit,Salary
+2024-01-02,Grocery Shopping,-150.00,Debit,Groceries
+2024-01-03,Electric Bill,-200.00,Debit,Utilities
+2024-01-04,ATM Withdrawal,-100.00,Debit,Cash
+2024-01-05,Online Transfer,-500.00,Debit,Transfer

@@ -369,11 +369,117 @@ app.get('/api/transactions/:userId', authenticateToken, (req, res) => {
   }
 });
 
-// Add a new transaction
+// Helper function to handle bulk transactions
+function handleBulkTransactions(req, res) {
+  const transactions = req.body.transactions;
+  console.log(`Processing bulk transaction request with ${transactions.length} transactions`);
+  
+  let savedCount = 0;
+  let errorCount = 0;
+  const errors = [];
+
+  // Validate all transactions first
+  for (let i = 0; i < transactions.length; i++) {
+    const transaction = transactions[i];
+    const { user_id, date, description, amount, type, frequency } = transaction;
+    
+    // Verify user can only add transactions for themselves
+    if (parseInt(user_id) !== req.user.userId) {
+      console.log(`Transaction ${i}: Access denied - user_id mismatch`, parseInt(user_id), req.user.userId);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Basic validation
+    if (!user_id || !date || !description || !amount || !type || !frequency) {
+      errors.push(`Transaction ${i}: Missing required fields`);
+      continue;
+    }
+
+    if (type !== 'credit' && type !== 'debit') {
+      errors.push(`Transaction ${i}: Invalid transaction type`);
+      continue;
+    }
+
+    if (frequency !== 'regular' && frequency !== 'irregular') {
+      errors.push(`Transaction ${i}: Invalid frequency`);
+      continue;
+    }
+
+    if (isNaN(amount) || parseFloat(amount) <= 0) {
+      errors.push(`Transaction ${i}: Invalid amount`);
+      continue;
+    }
+  }
+
+  if (errors.length > 0) {
+    console.log('Bulk transaction validation errors:', errors);
+    return res.status(400).json({
+      success: false,
+      message: 'Validation errors',
+      errors: errors
+    });
+  }
+
+  // Insert transactions one by one
+  let completedTransactions = 0;
+  const insertedTransactions = [];
+
+  transactions.forEach((transaction, index) => {
+    const { user_id, date, description, amount, type, frequency } = transaction;
+    
+    db.run(
+      `INSERT INTO transactions (user_id, date, description, amount, type, frequency, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [user_id, date, description, parseFloat(amount), type, frequency],
+      function(err) {
+        if (err) {
+          console.error(`Database error during bulk insert ${index}:`, err);
+          errorCount++;
+        } else {
+          console.log(`Transaction ${index} inserted successfully, ID:`, this.lastID);
+          savedCount++;
+          insertedTransactions.push({
+            id: this.lastID,
+            user_id,
+            date,
+            description,
+            amount: parseFloat(amount),
+            type,
+            frequency
+          });
+        }
+
+        completedTransactions++;
+        
+        // Send response when all transactions are processed
+        if (completedTransactions === transactions.length) {
+          console.log(`Bulk transaction complete: ${savedCount} saved, ${errorCount} errors`);
+          res.status(savedCount > 0 ? 201 : 500).json({
+            success: savedCount > 0,
+            message: `Bulk transaction complete: ${savedCount} saved, ${errorCount} errors`,
+            saved_count: savedCount,
+            error_count: errorCount,
+            transactions: insertedTransactions
+          });
+        }
+      }
+    );
+  });
+}
+
+// Add a new transaction (or multiple transactions)
 app.post('/api/transactions', authenticateToken, (req, res) => {
   try {
     console.log('Add transaction request received:', req.body);
     console.log('Authenticated user:', req.user);
+    
+    // Check if this is a bulk transaction request
+    if (req.body.transactions && Array.isArray(req.body.transactions)) {
+      return handleBulkTransactions(req, res);
+    }
     
     const { user_id, date, description, amount, type, frequency } = req.body;
     

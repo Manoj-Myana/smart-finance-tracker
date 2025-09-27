@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
 import pdfplumber
+import pandas as pd
+import openpyxl
 import re
 from datetime import datetime
 
@@ -72,6 +74,90 @@ def extract_transactions_from_pdf(file_path):
     
     return cleaned_transactions
 
+def extract_transactions_from_excel(file_path):
+    """
+    Extract transactions from Excel (.xlsx, .xls) or CSV files
+    """
+    try:
+        transactions = []
+        print(f"Starting Excel processing for: {file_path}")
+        
+        # Determine file type and read accordingly
+        file_extension = os.path.splitext(file_path.lower())[1]
+        
+        if file_extension == '.csv':
+            print("Processing CSV file")
+            df = pd.read_csv(file_path, encoding='utf-8', on_bad_lines='skip')
+        elif file_extension in ['.xlsx', '.xls']:
+            print(f"Processing Excel file: {file_extension}")
+            # Try to read all sheets, take the first one with data
+            excel_file = pd.ExcelFile(file_path)
+            sheet_names = excel_file.sheet_names
+            print(f"Available sheets: {sheet_names}")
+            
+            df = None
+            for sheet in sheet_names:
+                temp_df = pd.read_excel(file_path, sheet_name=sheet, header=None)
+                if not temp_df.empty and len(temp_df.columns) >= 3:
+                    df = temp_df
+                    print(f"Using sheet: {sheet}")
+                    break
+            
+            if df is None or df.empty:
+                print("No valid sheet found with sufficient columns")
+                return []
+        else:
+            print(f"Unsupported file format: {file_extension}")
+            return []
+        
+        print(f"DataFrame shape: {df.shape}")
+        print(f"DataFrame columns: {df.columns.tolist()}")
+        
+        # Convert DataFrame to list of lists (similar to PDF table format)
+        rows = []
+        for index, row in df.iterrows():
+            row_list = [str(cell) if pd.notna(cell) else '' for cell in row.values]
+            rows.append(row_list)
+        
+        print(f"Total rows extracted: {len(rows)}")
+        
+        # Process rows using the same logic as PDF
+        for row_num, row in enumerate(rows):
+            if len(row) >= 3:  # Minimum columns needed
+                # Skip actual header row (only check first row and only if it looks like column names)
+                if row_num == 0:
+                    # Check if the first row contains column headers (not transaction data)
+                    # Headers typically don't have dates or amounts in the first position
+                    if (not is_date(row[0]) or 
+                        (row[0].lower() in ['date', 'transaction_date', 'posting_date'] and 
+                         row[1].lower() in ['description', 'particulars', 'reference', 'remarks'] and
+                         row[2].lower() in ['amount', 'debit', 'credit', 'withdrawal', 'deposit'])):
+                        print(f"Skipping header row {row_num}: {row}")
+                        continue
+                
+                print(f"Processing Excel row {row_num}: {row}")
+                transaction = parse_transaction_row(row)
+                if transaction:
+                    transaction['id'] = len(transactions) + 1
+                    transactions.append(transaction)
+                    print(f"Added Excel transaction: {transaction}")
+                else:
+                    print(f"Failed to parse Excel row {row_num}: {row}")
+            else:
+                print(f"Skipping Excel row {row_num} - insufficient columns ({len(row)}): {row}")
+    
+    except Exception as e:
+        print(f"Error processing Excel file: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+    
+    # Remove duplicates and clean up
+    cleaned_transactions = remove_duplicates(transactions)
+    print(f"Final extracted Excel transactions: {len(cleaned_transactions)}")
+    
+    return cleaned_transactions
+
 def parse_transaction_row(row):
     """
     Parse a single transaction row from table data
@@ -115,9 +201,26 @@ def parse_transaction_row(row):
                 print("Detected INDIAN BANK format (5+ columns)")
                 return parse_indian_bank_format(clean_row)
         elif len(clean_row) >= 5:
-            # Old Indian Bank format: [Date, Date, Credit_Amount, Debit_Amount, Balance, Description]
-            print("Detected INDIAN BANK format (5+ columns)")
-            return parse_indian_bank_format(clean_row)
+            # Check for CSV format: [Date, Description, Amount, Type, Category]
+            if (is_date(clean_row[0]) and 
+                is_amount(clean_row[2]) and 
+                clean_row[3].lower() in ['credit', 'debit']):
+                print("Detected CSV format: [Date, Description, Amount, Type, Category]")
+                return parse_csv_format(clean_row)
+            else:
+                # Old Indian Bank format: [Date, Date, Credit_Amount, Debit_Amount, Balance, Description]
+                print("Detected INDIAN BANK format (5+ columns)")
+                return parse_indian_bank_format(clean_row)
+        elif len(clean_row) >= 4:
+            # Check for 4-column CSV format: [Date, Amount, Type, Description]
+            if (is_date(clean_row[0]) and 
+                is_amount(clean_row[1]) and 
+                clean_row[2].lower() in ['credit', 'debit']):
+                print("Detected 4-column CSV format: [Date, Amount, Type, Description]")
+                return parse_4_column_csv_format(clean_row)
+            else:
+                print("Unknown 4-column format")
+                return None
         else:
             print(f"Unknown format - insufficient columns ({len(clean_row)})")
             return None
@@ -182,7 +285,7 @@ def parse_indian_bank_6_column_format(clean_row):
             'amount': amount,
             'type': amount_type,
             'category': detect_category(description),
-            'frequency': 'one-time'
+            'frequency': 'irregular'
         }
         
         print(f"INDIAN BANK 6-COL: Successfully extracted transaction: {transaction}")
@@ -243,7 +346,7 @@ def parse_new_bank_format(clean_row):
             'amount': amount,
             'type': amount_type,
             'category': detect_category(description),
-            'frequency': 'one-time'
+            'frequency': 'irregular'
         }
         
         print(f"NEW FORMAT: Successfully extracted transaction: {transaction}")
@@ -304,7 +407,7 @@ def parse_indian_bank_format(clean_row):
             'amount': amount,
             'type': amount_type,
             'category': detect_category(description),
-            'frequency': 'one-time'
+            'frequency': 'irregular'
         }
         
         print(f"Extracted INDIAN BANK transaction: {transaction}")
@@ -312,6 +415,122 @@ def parse_indian_bank_format(clean_row):
         
     except Exception as e:
         print(f"Error parsing Indian Bank format: {e}")
+        return None
+
+def parse_csv_format(clean_row):
+    """Parse CSV format: [Date, Description, Amount, Type, Category]"""
+    try:
+        # Extract date (first column)
+        date_str = clean_row[0]
+        if not is_date(date_str):
+            return None
+        
+        # Extract description (second column)
+        description = clean_row[1] if len(clean_row) > 1 else 'Transaction'
+        
+        # Extract amount (third column)
+        amount_str = clean_row[2]
+        if not is_amount(amount_str):
+            return None
+        
+        amount = float(clean_amount(amount_str))
+        
+        # Extract type (fourth column)
+        type_str = clean_row[3].lower() if len(clean_row) > 3 else ''
+        if type_str not in ['credit', 'debit']:
+            # Try to determine from amount sign
+            if amount < 0:
+                amount = abs(amount)
+                amount_type = 'debit'
+            else:
+                amount_type = 'credit'
+        else:
+            amount_type = type_str
+            amount = abs(amount)  # Make sure amount is positive
+        
+        # Extract category (fifth column, optional)
+        category = clean_row[4] if len(clean_row) > 4 else detect_category(description)
+        
+        # Clean up description
+        description = description.replace('\n', ' ').strip()
+        if len(description) > 100:
+            description = description[:100] + '...'
+        
+        transaction = {
+            'id': 0,  # Will be assigned proper ID later
+            'date': format_date(date_str),
+            'description': description,
+            'amount': amount,
+            'type': amount_type,
+            'category': category,
+            'frequency': 'irregular'
+        }
+        
+        print(f"Extracted CSV transaction: {transaction}")
+        return transaction
+        
+    except Exception as e:
+        print(f"Error parsing CSV format: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def parse_4_column_csv_format(clean_row):
+    """Parse 4-column CSV format: [Date, Amount, Type, Description]"""
+    try:
+        # Extract date (first column)
+        date_str = clean_row[0]
+        if not is_date(date_str):
+            return None
+        
+        # Extract amount (second column)
+        amount_str = clean_row[1]
+        if not is_amount(amount_str):
+            return None
+        
+        amount = float(clean_amount(amount_str))
+        
+        # Extract type (third column)
+        type_str = clean_row[2].lower() if len(clean_row) > 2 else ''
+        if type_str not in ['credit', 'debit']:
+            # Try to determine from amount sign
+            if amount < 0:
+                amount = abs(amount)
+                amount_type = 'debit'
+            else:
+                amount_type = 'credit'
+        else:
+            amount_type = type_str
+            amount = abs(amount)  # Make sure amount is positive
+        
+        # Extract description (fourth column)
+        description = clean_row[3] if len(clean_row) > 3 else 'Transaction'
+        
+        # Auto-detect category from description
+        category = detect_category(description)
+        
+        # Clean up description
+        description = description.replace('\n', ' ').strip()
+        if len(description) > 100:
+            description = description[:100] + '...'
+        
+        transaction = {
+            'id': 0,  # Will be assigned proper ID later
+            'date': format_date(date_str),
+            'description': description,
+            'amount': amount,
+            'type': amount_type,
+            'category': category,
+            'frequency': 'irregular'
+        }
+        
+        print(f"Extracted 4-column CSV transaction: {transaction}")
+        return transaction
+        
+    except Exception as e:
+        print(f"Error parsing 4-column CSV format: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def extract_from_text_patterns(text, page_num):
@@ -342,7 +561,7 @@ def extract_from_text_patterns(text, page_num):
                     'amount': float(clean_amount(amount_str)),
                     'type': 'debit',
                     'category': detect_category(description),
-                    'frequency': 'one-time'
+                    'frequency': 'irregular'
                 }
                 
                 transactions.append(transaction)
@@ -627,9 +846,12 @@ def upload_and_process():
             print("ERROR: Empty filename")
             return jsonify({'error': 'No file selected'}), 400
         
-        if not file.filename.lower().endswith('.pdf'):
+        # Check file extension
+        filename_lower = file.filename.lower()
+        supported_extensions = ['.pdf', '.xlsx', '.xls', '.csv']
+        if not any(filename_lower.endswith(ext) for ext in supported_extensions):
             print(f"ERROR: Invalid file type: {file.filename}")
-            return jsonify({'error': 'Only PDF files are supported'}), 400
+            return jsonify({'error': 'Supported file types: PDF, Excel (.xlsx, .xls), CSV'}), 400
         
         # Save the uploaded file
         filename = file.filename
@@ -642,14 +864,29 @@ def upload_and_process():
         file_size = os.path.getsize(filepath)
         print(f"File size: {file_size} bytes")
         
-        # Process the PDF
-        print("=== STARTING PDF PROCESSING ===")
-        transactions = extract_transactions_from_pdf(filepath)
-        print(f"=== PDF PROCESSING COMPLETE: {len(transactions)} transactions ===")
+        # Determine file type and process accordingly
+        filename_lower = file.filename.lower()
+        if filename_lower.endswith('.pdf'):
+            print("=== STARTING PDF PROCESSING ===")
+            transactions = extract_transactions_from_pdf(filepath)
+            print(f"=== PDF PROCESSING COMPLETE: {len(transactions)} transactions ===")
+        elif filename_lower.endswith(('.xlsx', '.xls', '.csv')):
+            print("=== STARTING EXCEL/CSV PROCESSING ===")
+            transactions = extract_transactions_from_excel(filepath)
+            print(f"=== EXCEL/CSV PROCESSING COMPLETE: {len(transactions)} transactions ===")
+        else:
+            print(f"ERROR: Unsupported file type: {file.filename}")
+            os.remove(filepath)
+            return jsonify({'error': 'Unsupported file type'}), 400
         
         # Clean up the uploaded file
-        os.remove(filepath)
-        print("Temporary file cleaned up")
+        try:
+            os.remove(filepath)
+            print("Temporary file cleaned up")
+        except PermissionError as pe:
+            print(f"Warning: Could not delete temporary file {filepath}: {pe}")
+            # File is still in use, but processing completed successfully
+            pass
         
         return jsonify({
             'success': True,
