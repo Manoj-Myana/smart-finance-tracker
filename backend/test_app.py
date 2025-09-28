@@ -1084,6 +1084,11 @@ def predict_future_values(models, scalers, last_month_data, months_ahead=6):
     Predict future income, expense, and savings for the next N months
     """
     try:
+        print(f"=== PREDICTING FUTURE VALUES ===")
+        print(f"Models available: {list(models.keys()) if models else 'None'}")
+        print(f"Last month data shape: {last_month_data.shape if last_month_data is not None else 'None'}")
+        print(f"Last month data sample:\n{last_month_data.tail(2) if last_month_data is not None and len(last_month_data) > 0 else 'No data'}")
+        
         predictions = []
         
         # Get the last month info
@@ -1112,9 +1117,14 @@ def predict_future_values(models, scalers, last_month_data, months_ahead=6):
             future_features_scaled = scalers['feature_scaler'].transform(future_features)
             
             # Make predictions
+            print(f"Making prediction for month {i}, future_features: {future_features}")
+            print(f"future_features_scaled: {future_features_scaled}")
             predicted_income = max(0, models['income'].predict(future_features_scaled)[0])
             predicted_expense = max(0, models['expense'].predict(future_features_scaled)[0])
             predicted_savings = predicted_income - predicted_expense
+            
+            print(f"RAW predictions - Income: {models['income'].predict(future_features_scaled)[0]}, Expense: {models['expense'].predict(future_features_scaled)[0]}")
+            print(f"FINAL predictions - Income: {predicted_income}, Expense: {predicted_expense}, Savings: {predicted_savings}")
             
             predictions.append({
                 'future_date': f"{future_date.strftime('%B')} {future_year}",
@@ -1135,12 +1145,49 @@ def predict_future_values(models, scalers, last_month_data, months_ahead=6):
 def predict_regular_future_values(models, scalers, last_month_data, months_ahead=6):
     """
     Predict future regular income, expense, and savings for the next N months
+    Using simple trend analysis instead of complex ML to avoid scaling issues
     """
     try:
         predictions = []
         
-        # Get the last month info
-        last_sequence = len(last_month_data)
+        if len(last_month_data) < 2:
+            # If insufficient data, return zero predictions
+            current_date = datetime.now()
+            for i in range(1, months_ahead + 1):
+                future_date = current_date + timedelta(days=30 * i)
+                predictions.append({
+                    'future_date': f"{future_date.strftime('%B')} {future_date.year}",
+                    'month': future_date.strftime('%B'),
+                    'year': future_date.year,
+                    'predicted_income': 0.0,
+                    'predicted_expense': 0.0,
+                    'predicted_savings': 0.0
+                })
+            return predictions
+        
+        # Calculate simple averages and trends from recent data
+        recent_data = last_month_data.tail(min(6, len(last_month_data)))  # Use last 6 months or available data
+        
+        # Calculate averages
+        avg_income = recent_data['income'].mean()
+        avg_expense = recent_data['expense'].mean()
+        
+        # Calculate simple trend (difference between recent and older data)
+        if len(recent_data) >= 3:
+            recent_avg_income = recent_data['income'].tail(3).mean()
+            older_avg_income = recent_data['income'].head(3).mean() if len(recent_data) >= 6 else recent_avg_income
+            income_trend = (recent_avg_income - older_avg_income) / max(3, len(recent_data) - 3)
+            
+            recent_avg_expense = recent_data['expense'].tail(3).mean()
+            older_avg_expense = recent_data['expense'].head(3).mean() if len(recent_data) >= 6 else recent_avg_expense
+            expense_trend = (recent_avg_expense - older_avg_expense) / max(3, len(recent_data) - 3)
+        else:
+            income_trend = 0
+            expense_trend = 0
+        
+        print(f"Average income: {avg_income}, Average expense: {avg_expense}")
+        print(f"Income trend: {income_trend}, Expense trend: {expense_trend}")
+        
         current_date = datetime.now()
         
         for i in range(1, months_ahead + 1):
@@ -1149,25 +1196,12 @@ def predict_regular_future_values(models, scalers, last_month_data, months_ahead
             future_month = future_date.month
             future_year = future_date.year
             
-            # Calculate recent trends (use last available data)
-            recent_income_trend = last_month_data['income'].tail(3).mean()
-            recent_expense_trend = last_month_data['expense'].tail(3).mean()
-            
-            # Create features for prediction
-            future_features = np.array([[
-                last_sequence + i,
-                future_month,
-                recent_income_trend,
-                recent_expense_trend
-            ]])
-            
-            # Scale features
-            future_features_scaled = scalers['feature_scaler'].transform(future_features)
-            
-            # Make predictions
-            predicted_income = max(0, models['income'].predict(future_features_scaled)[0])
-            predicted_expense = max(0, models['expense'].predict(future_features_scaled)[0])
+            # Simple trend-based prediction
+            predicted_income = max(0, avg_income + (income_trend * i))
+            predicted_expense = max(0, avg_expense + (expense_trend * i))
             predicted_savings = predicted_income - predicted_expense
+            
+            print(f"Month {i}: Income={predicted_income:.2f}, Expense={predicted_expense:.2f}, Savings={predicted_savings:.2f}")
             
             predictions.append({
                 'future_date': f"{future_date.strftime('%B')} {future_year}",
@@ -1178,12 +1212,19 @@ def predict_regular_future_values(models, scalers, last_month_data, months_ahead
                 'predicted_savings': round(predicted_savings, 2)
             })
         
-        print(f"Generated {len(predictions)} regular future predictions")
+        print(f"Generated {len(predictions)} regular future predictions using simple trend analysis")
         return predictions
         
     except Exception as e:
         print(f"Error making regular predictions: {e}")
+        import traceback
+        traceback.print_exc()
         return []
+
+@app.route('/api/test-connection', methods=['GET'])
+def test_connection():
+    print("=== TEST CONNECTION CALLED ===")
+    return jsonify({'message': 'Flask server is working', 'port': 5001})
 
 @app.route('/api/predict-future', methods=['POST'])
 def predict_future_financial_values():
@@ -1191,7 +1232,8 @@ def predict_future_financial_values():
     API endpoint to predict future income, expenses, and savings
     """
     try:
-        print("=== FUTURE PREDICTION REQUEST ===")
+        print("=== FUTURE PREDICTION REQUEST RECEIVED ===")
+        print("Endpoint /api/predict-future called")
         
         # Get transaction data from request
         request_data = request.get_json()
@@ -1237,8 +1279,22 @@ def predict_future_financial_values():
                 'regular_predictions': []
             }), 400
         
-        # Make predictions for all transactions
-        predictions = predict_future_values(models, scalers, monthly_df, months_ahead)
+        # Make predictions for all transactions - use the same reliable algorithm as regular predictions
+        predictions = predict_regular_future_values(models, scalers, monthly_df, months_ahead)
+        
+        # Convert field names from regular format to main predictions format
+        main_predictions = []
+        for pred in predictions:
+            main_predictions.append({
+                'future_date': pred['future_date'],
+                'month': pred['month'], 
+                'year': pred['year'],
+                'income_expected': pred['predicted_income'],
+                'expense_expected': pred['predicted_expense'],
+                'savings_expected': pred['predicted_savings']
+            })
+        
+        predictions = main_predictions
         
         # Handle regular transactions predictions
         regular_predictions = []

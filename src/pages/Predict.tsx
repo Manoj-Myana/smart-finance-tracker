@@ -104,14 +104,11 @@ const Predict: React.FC = () => {
     setModelInfo(null);
 
     try {
-      console.log('Fetching transactions for prediction...');
       const transactions = await fetchTransactions();
       
       if (transactions.length === 0) {
         throw new Error('No transaction data available for prediction');
       }
-
-      console.log(`Sending ${transactions.length} transactions for ML prediction`);
 
       // Send transactions to Flask ML API
       const response = await fetch('http://localhost:5001/api/predict-future', {
@@ -126,9 +123,6 @@ const Predict: React.FC = () => {
       });
 
       const result = await response.json();
-      console.log('ML Prediction result:', result);
-      console.log('Regular predictions from backend:', result.regular_predictions);
-      console.log('Regular predictions length:', result.regular_predictions?.length || 0);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to generate predictions');
@@ -137,22 +131,51 @@ const Predict: React.FC = () => {
       setPredictions(result.predictions);
       setModelInfo(result.model_info);
       
+      // Apply field name mapping to main predictions to ensure consistent field names
+      const mappedMainPredictions = result.predictions.map((pred: any) => ({
+        ...pred,
+        income_expected: pred.predicted_income || pred.income_expected || pred.income || 0,
+        expense_expected: pred.predicted_expense || pred.expense_expected || pred.expense || 0,
+        savings_expected: pred.predicted_savings || pred.predicted_saving || pred.savings_expected || pred.saving || 0,
+        investment_expected: pred.predicted_investment || pred.investment_expected || pred.investment || 0
+      }));
+      setPredictions(mappedMainPredictions);
+      
       // Use regular predictions from backend if available, otherwise calculate fallback
       if (result.regular_predictions && result.regular_predictions.length > 0) {
-        console.log('Using backend regular predictions:', result.regular_predictions);
-        console.log('First regular prediction structure:', result.regular_predictions[0]);
-        console.log('Regular prediction fields:', Object.keys(result.regular_predictions[0]));
-        setRegularPredictions(result.regular_predictions);
+        // Map regular predictions to ensure field names match what the table expects
+        const mappedRegularPredictions = result.regular_predictions.map((pred: any) => {
+          const mapped = {
+            future_date: pred.future_date,
+            month: pred.month,
+            year: pred.year,
+            predicted_income: pred.predicted_income || pred.income_expected || pred.income || 0,
+            predicted_expense: pred.predicted_expense || pred.expense_expected || pred.expense || 0,
+            predicted_savings: pred.predicted_savings || pred.predicted_saving || pred.savings_expected || pred.saving || 0,
+            predicted_investment: pred.predicted_investment || pred.investment_expected || pred.investment || 0
+          };
+          
+          return mapped;
+        });
+        
+        setRegularPredictions(mappedRegularPredictions);
       } else {
-        console.log('Using fallback calculation for regular predictions');
-        // Fallback calculation for demonstration
-        const regularPredictions = result.predictions.map((pred: any) => ({
-          month: pred.month,
-          predicted_income: pred.predicted_income * 0.7, // 70% regular income
-          predicted_expense: pred.predicted_expense * 0.6, // 60% regular expenses
-          predicted_savings: (pred.predicted_income * 0.7) - (pred.predicted_expense * 0.6)
-        }));
-        console.log('Calculated fallback regular predictions:', regularPredictions);
+        // Fallback: Use main predictions as regular predictions when no separate regular data
+        const regularPredictions = result.predictions.map((pred: any) => {
+          const mapped = {
+            future_date: pred.future_date,
+            month: pred.month,
+            year: pred.year,
+            // Try multiple field name variations - use consistent field names that match table
+            predicted_income: pred.predicted_income || pred.income_expected || pred.income || 0,
+            predicted_expense: pred.predicted_expense || pred.expense_expected || pred.expense || 0,
+            predicted_savings: pred.predicted_savings || pred.predicted_saving || pred.savings_expected || pred.saving || 0,
+            predicted_investment: pred.predicted_investment || pred.investment_expected || pred.investment || 0
+          };
+          
+          return mapped;
+        });
+        
         setRegularPredictions(regularPredictions);
       }
       
@@ -591,10 +614,7 @@ const Predict: React.FC = () => {
                     >
                       <td style={{ padding: '20px 24px', whiteSpace: 'nowrap' }}>
                         <div style={{ fontWeight: '700', color: '#2d3748', fontSize: '16px' }}>
-                          {prediction.future_date}
-                        </div>
-                        <div style={{ fontSize: '14px', color: '#718096', marginTop: '4px' }}>
-                          {prediction.month} {prediction.year}
+                          {prediction.month} {prediction.year || new Date().getFullYear()}
                         </div>
                       </td>
                       <td style={{ padding: '20px 24px', whiteSpace: 'nowrap', textAlign: 'right' }}>
@@ -871,7 +891,7 @@ const Predict: React.FC = () => {
                       >
                         <td style={{ padding: '20px 24px', whiteSpace: 'nowrap' }}>
                           <div style={{ fontWeight: '700', color: '#14532d', fontSize: '16px' }}>
-                            {prediction.month}
+                            {prediction.future_date || `${prediction.month} ${prediction.year || new Date().getFullYear()}`}
                           </div>
                         </td>
                         <td style={{ padding: '20px 24px', whiteSpace: 'nowrap', textAlign: 'right' }}>

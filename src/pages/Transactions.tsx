@@ -47,6 +47,9 @@ const Transactions: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   
   // New filter states
   const [sortBy, setSortBy] = useState<'none' | 'newest' | 'oldest'>('none');
@@ -246,6 +249,92 @@ const Transactions: React.FC = () => {
       console.error('Error deleting transaction:', error);
       alert('Error deleting transaction. Please try again.');
     }
+  };
+
+  // Bulk selection functions
+  const handleSelectTransaction = (transactionId: number) => {
+    const newSelected = new Set(selectedTransactions);
+    if (newSelected.has(transactionId)) {
+      newSelected.delete(transactionId);
+    } else {
+      newSelected.add(transactionId);
+    }
+    setSelectedTransactions(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedTransactions.size === filteredTransactions.length) {
+      setSelectedTransactions(new Set());
+    } else {
+      setSelectedTransactions(new Set(filteredTransactions.map(t => t.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTransactions.size === 0) return;
+    
+    if (!window.confirm(`Are you sure you want to delete ${selectedTransactions.size} selected transaction(s)?`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      // Delete transactions one by one (we can optimize this later with a bulk API)
+      const deletePromises = Array.from(selectedTransactions).map(transactionId =>
+        fetch(`http://localhost:5000/api/transactions/${transactionId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      const results = await Promise.all(deletePromises);
+      const failedDeletes = results.filter(response => !response.ok);
+
+      if (failedDeletes.length === 0) {
+        // All deletions successful
+        setSelectedTransactions(new Set());
+        if (user) {
+          fetchTransactions(user.id);
+        }
+        alert(`Successfully deleted ${selectedTransactions.size} transaction(s)`);
+      } else {
+        alert(`Failed to delete ${failedDeletes.length} transaction(s). Please try again.`);
+      }
+    } catch (error) {
+      console.error('Error during bulk delete:', error);
+      alert('Error deleting transactions. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Toggle selection mode
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    if (isSelectionMode) {
+      // Exit selection mode - clear all selections
+      setSelectedTransactions(new Set());
+    }
+  };
+
+  // Format currency consistently in rupees
+  const formatCurrency = (amount: number, showSign: boolean = false): string => {
+    const absAmount = Math.abs(amount);
+    const formatted = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2
+    }).format(absAmount);
+    
+    if (showSign) {
+      return amount >= 0 ? `+${formatted}` : `-${formatted}`;
+    }
+    return formatted;
   };
 
   // Filter and search transactions with new comprehensive filters
@@ -997,97 +1086,552 @@ const Transactions: React.FC = () => {
               </div>
 
               {/* Transactions Table */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '16px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                border: '1px solid #f3f4f6',
+                overflow: 'hidden'
+              }}>
+                {/* Table Controls */}
+                <div style={{
+                  padding: '20px 24px',
+                  borderBottom: '1px solid #f3f4f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}>
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: 'bold',
+                    color: '#1f2937',
+                    margin: 0
+                  }}>
+                    Transactions ({filteredTransactions.length})
+                  </h3>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {!isSelectionMode ? (
+                      <button
+                        onClick={toggleSelectionMode}
+                        style={{
+                          padding: '10px 16px',
+                          backgroundColor: '#3b82f6',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.backgroundColor = '#2563eb';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.backgroundColor = '#3b82f6';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        Select Multiple
+                      </button>
+                    ) : (
+                      <button
+                        onClick={toggleSelectionMode}
+                        style={{
+                          padding: '10px 16px',
+                          backgroundColor: '#6b7280',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.backgroundColor = '#4b5563';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.backgroundColor = '#6b7280';
+                        }}
+                      >
+                        Cancel Selection
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {filteredTransactions.length === 0 ? (
-                  <div className="text-center py-16">
-                    <div className="p-4 bg-gray-50 rounded-full w-20 h-20 mx-auto mb-6">
-                      <FileText className="h-12 w-12 text-gray-400 mx-auto" />
+                  <div style={{
+                    textAlign: 'center',
+                    paddingTop: '64px',
+                    paddingBottom: '64px'
+                  }}>
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '50%',
+                      width: '80px',
+                      height: '80px',
+                      margin: '0 auto 24px auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <FileText style={{ height: '48px', width: '48px', color: '#9ca3af' }} />
                     </div>
-                    <p className="text-gray-600 text-xl font-medium mb-2">No transactions found</p>
-                    <p className="text-gray-400 text-base">
+                    <p style={{
+                      color: '#4b5563',
+                      fontSize: '20px',
+                      fontWeight: '500',
+                      marginBottom: '8px'
+                    }}>No transactions found</p>
+                    <p style={{
+                      color: '#9ca3af',
+                      fontSize: '16px'
+                    }}>
                       {transactions.length === 0 
                         ? "Add your first transaction to get started!" 
                         : "Try adjusting your search or filter criteria."}
                     </p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
+                  <div style={{ overflowX: 'auto' }}>
+                    {/* Bulk Actions */}
+                    {isSelectionMode && selectedTransactions.size > 0 && (
+                      <div style={{
+                        padding: '16px 24px',
+                        backgroundColor: '#f0f9ff',
+                        border: '1px solid #0ea5e9',
+                        borderRadius: '8px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px'
+                        }}>
+                          <span style={{
+                            color: '#0c4a6e',
+                            fontWeight: '600',
+                            fontSize: '16px'
+                          }}>
+                            {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''} selected
+                          </span>
+                          <button
+                            onClick={() => setSelectedTransactions(new Set())}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: 'transparent',
+                              border: '1px solid #0ea5e9',
+                              borderRadius: '6px',
+                              color: '#0ea5e9',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: '500',
+                              transition: 'all 0.2s ease-in-out'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = '#0ea5e9';
+                              e.currentTarget.style.color = 'white';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = '#0ea5e9';
+                            }}
+                          >
+                            Clear Selection
+                          </button>
+                        </div>
+                        <button
+                          onClick={handleBulkDelete}
+                          disabled={isDeleting}
+                          style={{
+                            padding: '10px 20px',
+                            backgroundColor: isDeleting ? '#9ca3af' : '#ef4444',
+                            border: 'none',
+                            borderRadius: '8px',
+                            color: 'white',
+                            cursor: isDeleting ? 'not-allowed' : 'pointer',
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transition: 'all 0.2s ease-in-out'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!isDeleting) {
+                              e.currentTarget.style.backgroundColor = '#dc2626';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (!isDeleting) {
+                              e.currentTarget.style.backgroundColor = '#ef4444';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }
+                          }}
+                        >
+                          <Trash2 style={{ height: '16px', width: '16px' }} />
+                          {isDeleting ? 'Deleting...' : `Delete Selected (${selectedTransactions.size})`}
+                        </button>
+                      </div>
+                    )}
+                    <table style={{
+                      width: '100%',
+                      borderCollapse: 'separate',
+                      borderSpacing: '0'
+                    }}>
+                      <thead style={{
+                        backgroundColor: '#f9fafb',
+                        borderBottom: '2px solid #e5e7eb'
+                      }}>
                         <tr>
-                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Date</th>
-                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Description</th>
-                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Type</th>
-                          <th className="text-left py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Frequency</th>
-                          <th className="text-right py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Amount</th>
-                          <th className="text-center py-5 px-6 font-bold text-gray-800 text-lg uppercase tracking-wider">Actions</th>
+                          {isSelectionMode && (
+                            <th style={{
+                              textAlign: 'center',
+                              paddingTop: '20px',
+                              paddingBottom: '20px',
+                              paddingLeft: '24px',
+                              paddingRight: '24px',
+                              fontWeight: 'bold',
+                              color: '#1f2937',
+                              fontSize: '18px',
+                              borderRight: '1px solid #f3f4f6',
+                              width: '60px'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedTransactions.size === filteredTransactions.length && filteredTransactions.length > 0}
+                                onChange={handleSelectAll}
+                                style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  cursor: 'pointer',
+                                  accentColor: '#3b82f6'
+                                }}
+                              />
+                            </th>
+                          )}
+                          <th style={{
+                            textAlign: 'left',
+                            paddingTop: '20px',
+                            paddingBottom: '20px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
+                            fontWeight: 'bold',
+                            color: '#1f2937',
+                            fontSize: '18px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em',
+                            borderRight: '1px solid #f3f4f6'
+                          }}>Date</th>
+                          <th style={{
+                            textAlign: 'left',
+                            paddingTop: '20px',
+                            paddingBottom: '20px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
+                            fontWeight: 'bold',
+                            color: '#1f2937',
+                            fontSize: '18px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em',
+                            borderRight: '1px solid #f3f4f6'
+                          }}>Description</th>
+                          <th style={{
+                            textAlign: 'left',
+                            paddingTop: '20px',
+                            paddingBottom: '20px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
+                            fontWeight: 'bold',
+                            color: '#1f2937',
+                            fontSize: '18px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em',
+                            borderRight: '1px solid #f3f4f6'
+                          }}>Type</th>
+                          <th style={{
+                            textAlign: 'left',
+                            paddingTop: '20px',
+                            paddingBottom: '20px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
+                            fontWeight: 'bold',
+                            color: '#1f2937',
+                            fontSize: '18px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em',
+                            borderRight: '1px solid #f3f4f6'
+                          }}>Frequency</th>
+                          <th style={{
+                            textAlign: 'right',
+                            paddingTop: '20px',
+                            paddingBottom: '20px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
+                            fontWeight: 'bold',
+                            color: '#1f2937',
+                            fontSize: '18px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em',
+                            borderRight: '1px solid #f3f4f6'
+                          }}>Amount</th>
+                          <th style={{
+                            textAlign: 'center',
+                            paddingTop: '20px',
+                            paddingBottom: '20px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
+                            fontWeight: 'bold',
+                            color: '#1f2937',
+                            fontSize: '18px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.1em'
+                          }}>Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {filteredTransactions.map((transaction, index) => (
-                          <tr key={transaction.id} className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                            <td className="py-6 px-6 text-base text-gray-600 font-medium">
-                              {new Date(transaction.date).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </td>
-                            <td className="py-6 px-6">
-                              <div className="max-w-xs">
-                                <p className="text-lg font-medium text-gray-900 truncate">
-                                  {transaction.description}
-                                </p>
-                              </div>
-                            </td>
-                            <td className="py-6 px-6">
-                              <span className={`inline-flex items-center px-4 py-2 rounded-full text-base font-medium ${
-                                transaction.type === 'credit' 
-                                  ? 'bg-green-100 text-green-700 border border-green-200' 
-                                  : 'bg-red-100 text-red-700 border border-red-200'
-                              }`}>
-                                {transaction.type === 'credit' ? (
-                                  <TrendingUp className="h-5 w-5 mr-2" />
-                                ) : (
-                                  <TrendingDown className="h-5 w-5 mr-2" />
-                                )}
-                                {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                              </span>
-                            </td>
-                            <td className="py-6 px-6">
-                              <span className={`inline-flex items-center px-4 py-2 rounded-full text-base font-medium ${
-                                transaction.frequency === 'regular' 
-                                  ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                                  : 'bg-amber-100 text-amber-700 border border-amber-200'
-                              }`}>
-                                {transaction.frequency.charAt(0).toUpperCase() + transaction.frequency.slice(1)}
-                              </span>
-                            </td>
-                            <td className={`py-6 px-6 text-right font-bold text-lg ${
-                              transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {transaction.type === 'credit' ? '+' : '-'}${transaction.amount.toFixed(2)}
-                            </td>
-                            <td className="py-6 px-6 text-center">
-                              <div className="flex items-center justify-center space-x-2">
-                                <button
-                                  onClick={() => handleEditTransaction(transaction)}
-                                  className="p-3 text-blue-500 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-200"
-                                  title="Edit transaction"
-                                >
-                                  <Edit className="h-6 w-6" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteTransaction(transaction.id)}
-                                  className="p-3 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-xl transition-all duration-200 border border-transparent hover:border-red-200"
-                                  title="Delete transaction"
-                                >
-                                  <Trash2 className="h-6 w-6" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                      <tbody>
+                        {filteredTransactions.map((transaction, index) => {
+                          const baseRowStyle = {
+                            backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb',
+                            borderBottom: '1px solid #f3f4f6',
+                            transition: 'all 0.2s ease-in-out'
+                          };
+
+                          const hoverStyle = {
+                            ...baseRowStyle,
+                            backgroundColor: '#f3f4f6',
+                            transform: 'translateX(2px)',
+                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                          };
+
+                          return (
+                            <tr 
+                              key={transaction.id}
+                              style={baseRowStyle}
+                              onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
+                              onMouseLeave={(e) => Object.assign(e.currentTarget.style, baseRowStyle)}
+                            >
+                              {isSelectionMode && (
+                                <td style={{
+                                  textAlign: 'center',
+                                  paddingTop: '24px',
+                                  paddingBottom: '24px',
+                                  paddingLeft: '24px',
+                                  paddingRight: '24px',
+                                  borderRight: '1px solid #f3f4f6'
+                                }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedTransactions.has(transaction.id)}
+                                    onChange={() => handleSelectTransaction(transaction.id)}
+                                    style={{
+                                      width: '18px',
+                                      height: '18px',
+                                      cursor: 'pointer',
+                                      accentColor: '#3b82f6'
+                                    }}
+                                  />
+                                </td>
+                              )}
+                              <td style={{
+                                paddingTop: '24px',
+                                paddingBottom: '24px',
+                                paddingLeft: '24px',
+                                paddingRight: '24px',
+                                fontSize: '16px',
+                                color: '#4b5563',
+                                fontWeight: '500',
+                                borderRight: '1px solid #f3f4f6'
+                              }}>
+                                {new Date(transaction.date).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </td>
+                              <td style={{
+                                paddingTop: '24px',
+                                paddingBottom: '24px',
+                                paddingLeft: '24px',
+                                paddingRight: '24px',
+                                borderRight: '1px solid #f3f4f6'
+                              }}>
+                                <div style={{ maxWidth: '300px' }}>
+                                  <p style={{
+                                    fontSize: '18px',
+                                    fontWeight: '500',
+                                    color: '#111827',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    margin: '0'
+                                  }}>
+                                    {transaction.description}
+                                  </p>
+                                </div>
+                              </td>
+                              <td style={{
+                                paddingTop: '24px',
+                                paddingBottom: '24px',
+                                paddingLeft: '24px',
+                                paddingRight: '24px',
+                                borderRight: '1px solid #f3f4f6'
+                              }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '8px 16px',
+                                  borderRadius: '9999px',
+                                  fontSize: '16px',
+                                  fontWeight: '500',
+                                  backgroundColor: transaction.type === 'credit' ? '#dcfce7' : '#fee2e2',
+                                  color: transaction.type === 'credit' ? '#15803d' : '#dc2626',
+                                  border: transaction.type === 'credit' ? '1px solid #bbf7d0' : '1px solid #fecaca'
+                                }}>
+                                  {transaction.type === 'credit' ? (
+                                    <TrendingUp style={{ height: '20px', width: '20px', marginRight: '8px' }} />
+                                  ) : (
+                                    <TrendingDown style={{ height: '20px', width: '20px', marginRight: '8px' }} />
+                                  )}
+                                  {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                                </span>
+                              </td>
+                              <td style={{
+                                paddingTop: '24px',
+                                paddingBottom: '24px',
+                                paddingLeft: '24px',
+                                paddingRight: '24px',
+                                borderRight: '1px solid #f3f4f6'
+                              }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '8px 16px',
+                                  borderRadius: '9999px',
+                                  fontSize: '16px',
+                                  fontWeight: '500',
+                                  backgroundColor: transaction.frequency === 'regular' ? '#dbeafe' : '#fef3c7',
+                                  color: transaction.frequency === 'regular' ? '#1d4ed8' : '#d97706',
+                                  border: transaction.frequency === 'regular' ? '1px solid #c7d2fe' : '1px solid #fed7aa'
+                                }}>
+                                  {transaction.frequency.charAt(0).toUpperCase() + transaction.frequency.slice(1)}
+                                </span>
+                              </td>
+                              <td style={{
+                                paddingTop: '24px',
+                                paddingBottom: '24px',
+                                paddingLeft: '24px',
+                                paddingRight: '24px',
+                                textAlign: 'right',
+                                fontWeight: 'bold',
+                                fontSize: '18px',
+                                color: transaction.type === 'credit' ? '#059669' : '#dc2626',
+                                borderRight: '1px solid #f3f4f6'
+                              }}>
+                                {formatCurrency(transaction.type === 'credit' ? transaction.amount : -transaction.amount, true)}
+                              </td>
+                              <td style={{
+                                paddingTop: '24px',
+                                paddingBottom: '24px',
+                                paddingLeft: '24px',
+                                paddingRight: '24px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <button
+                                    onClick={() => handleEditTransaction(transaction)}
+                                    style={{
+                                      backgroundColor: '#3b82f6',
+                                      color: 'white',
+                                      padding: '8px 16px',
+                                      borderRadius: '8px',
+                                      fontSize: '14px',
+                                      fontWeight: '600',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = '#2563eb';
+                                      e.currentTarget.style.transform = 'translateY(-2px)';
+                                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = '#3b82f6';
+                                      e.currentTarget.style.transform = 'translateY(0)';
+                                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.2)';
+                                    }}
+                                  >
+                                    <Edit style={{ height: '16px', width: '16px' }} />
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTransaction(transaction.id)}
+                                    style={{
+                                      backgroundColor: '#ef4444',
+                                      color: 'white',
+                                      padding: '8px 16px',
+                                      borderRadius: '8px',
+                                      fontSize: '14px',
+                                      fontWeight: '600',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = '#dc2626';
+                                      e.currentTarget.style.transform = 'translateY(-2px)';
+                                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = '#ef4444';
+                                      e.currentTarget.style.transform = 'translateY(0)';
+                                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.2)';
+                                    }}
+                                  >
+                                    <Trash2 style={{ height: '16px', width: '16px' }} />
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
