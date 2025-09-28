@@ -5,7 +5,12 @@ import pdfplumber
 import pandas as pd
 import openpyxl
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+import warnings
+warnings.filterwarnings('ignore')
 
 app = Flask(__name__)
 CORS(app)
@@ -899,6 +904,272 @@ def upload_and_process():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+def prepare_transaction_data_for_ml(transactions_data):
+    """
+    Prepare transaction data for machine learning prediction
+    """
+    try:
+        print(f"Preparing ML data for {len(transactions_data)} transactions")
+        
+        if not transactions_data:
+            return None
+            
+        # Convert to DataFrame
+        df = pd.DataFrame(transactions_data)
+        
+        # Convert date to datetime
+        df['date'] = pd.to_datetime(df['date'])
+        
+        # Extract year-month for grouping
+        df['year_month'] = df['date'].dt.to_period('M')
+        
+        # Separate income and expenses
+        income_df = df[df['type'] == 'credit'].copy()
+        expense_df = df[df['type'] == 'debit'].copy()
+        
+        # Group by month and calculate totals
+        monthly_data = []
+        
+        # Get all unique months
+        all_months = df['year_month'].unique()
+        
+        for month in all_months:
+            month_income = income_df[income_df['year_month'] == month]['amount'].sum()
+            month_expense = expense_df[expense_df['year_month'] == month]['amount'].sum()
+            month_savings = month_income - month_expense
+            
+            monthly_data.append({
+                'year_month': month,
+                'income': month_income,
+                'expense': month_expense,
+                'savings': month_savings,
+                'month_numeric': month.month,
+                'year': month.year
+            })
+        
+        monthly_df = pd.DataFrame(monthly_data)
+        monthly_df = monthly_df.sort_values('year_month')
+        
+        print(f"Prepared {len(monthly_df)} monthly data points for ML")
+        return monthly_df
+        
+    except Exception as e:
+        print(f"Error preparing ML data: {e}")
+        return None
+
+def create_ml_features(monthly_df):
+    """
+    Create features for machine learning model
+    """
+    try:
+        if len(monthly_df) < 3:
+            print("Insufficient data for ML (need at least 3 months)")
+            return None, None
+            
+        # Create features (X) and targets (y)
+        features = []
+        targets = {'income': [], 'expense': [], 'savings': []}
+        
+        # Use sequential month numbers as primary feature
+        monthly_df = monthly_df.reset_index(drop=True)
+        
+        for i in range(len(monthly_df)):
+            # Features: [month_sequence, month_of_year, recent_trend]
+            month_sequence = i + 1
+            month_of_year = monthly_df.iloc[i]['month_numeric']
+            
+            # Calculate recent trend (average of last 2-3 months)
+            if i >= 2:
+                recent_income_trend = monthly_df.iloc[max(0, i-2):i]['income'].mean()
+                recent_expense_trend = monthly_df.iloc[max(0, i-2):i]['expense'].mean()
+            else:
+                recent_income_trend = monthly_df.iloc[:i+1]['income'].mean()
+                recent_expense_trend = monthly_df.iloc[:i+1]['expense'].mean()
+            
+            features.append([
+                month_sequence,
+                month_of_year,
+                recent_income_trend,
+                recent_expense_trend
+            ])
+            
+            targets['income'].append(monthly_df.iloc[i]['income'])
+            targets['expense'].append(monthly_df.iloc[i]['expense'])
+            targets['savings'].append(monthly_df.iloc[i]['savings'])
+        
+        X = np.array(features)
+        y = {
+            'income': np.array(targets['income']),
+            'expense': np.array(targets['expense']),
+            'savings': np.array(targets['savings'])
+        }
+        
+        print(f"Created features: {X.shape}, targets: {len(y)}")
+        return X, y
+        
+    except Exception as e:
+        print(f"Error creating ML features: {e}")
+        return None, None
+
+def train_prediction_models(X, y):
+    """
+    Train machine learning models for income, expense, and savings prediction
+    """
+    try:
+        models = {}
+        scalers = {}
+        
+        # Scale features
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        
+        # Train separate models for income, expense, and savings
+        for target_type in ['income', 'expense', 'savings']:
+            model = LinearRegression()
+            model.fit(X_scaled, y[target_type])
+            models[target_type] = model
+            
+            print(f"Trained {target_type} model, score: {model.score(X_scaled, y[target_type]):.3f}")
+        
+        scalers['feature_scaler'] = scaler
+        
+        return models, scalers
+        
+    except Exception as e:
+        print(f"Error training ML models: {e}")
+        return None, None
+
+def predict_future_values(models, scalers, last_month_data, months_ahead=6):
+    """
+    Predict future income, expense, and savings for the next N months
+    """
+    try:
+        predictions = []
+        
+        # Get the last month info
+        last_sequence = len(last_month_data)
+        current_date = datetime.now()
+        
+        for i in range(1, months_ahead + 1):
+            # Calculate future date
+            future_date = current_date + timedelta(days=30 * i)
+            future_month = future_date.month
+            future_year = future_date.year
+            
+            # Calculate recent trends (use last available data)
+            recent_income_trend = last_month_data['income'].tail(3).mean()
+            recent_expense_trend = last_month_data['expense'].tail(3).mean()
+            
+            # Create features for prediction
+            future_features = np.array([[
+                last_sequence + i,
+                future_month,
+                recent_income_trend,
+                recent_expense_trend
+            ]])
+            
+            # Scale features
+            future_features_scaled = scalers['feature_scaler'].transform(future_features)
+            
+            # Make predictions
+            predicted_income = max(0, models['income'].predict(future_features_scaled)[0])
+            predicted_expense = max(0, models['expense'].predict(future_features_scaled)[0])
+            predicted_savings = predicted_income - predicted_expense
+            
+            predictions.append({
+                'future_date': f"{future_date.strftime('%B')} {future_year}",
+                'month': future_date.strftime('%B'),
+                'year': future_year,
+                'income_expected': round(predicted_income, 2),
+                'expense_expected': round(predicted_expense, 2),
+                'savings_expected': round(predicted_savings, 2)
+            })
+        
+        print(f"Generated {len(predictions)} future predictions")
+        return predictions
+        
+    except Exception as e:
+        print(f"Error making predictions: {e}")
+        return []
+
+@app.route('/api/predict-future', methods=['POST'])
+def predict_future_financial_values():
+    """
+    API endpoint to predict future income, expenses, and savings
+    """
+    try:
+        print("=== FUTURE PREDICTION REQUEST ===")
+        
+        # Get transaction data from request
+        request_data = request.get_json()
+        
+        if not request_data or 'transactions' not in request_data:
+            return jsonify({
+                'success': False,
+                'error': 'Transaction data required for prediction'
+            }), 400
+        
+        transactions = request_data['transactions']
+        months_ahead = request_data.get('months_ahead', 6)  # Default to 6 months
+        
+        print(f"Received {len(transactions)} transactions for prediction")
+        
+        # Prepare data for ML
+        monthly_df = prepare_transaction_data_for_ml(transactions)
+        if monthly_df is None or len(monthly_df) < 3:
+            return jsonify({
+                'success': False,
+                'error': 'Insufficient transaction history for prediction (need at least 3 months)',
+                'predictions': []
+            }), 400
+        
+        # Create ML features
+        X, y = create_ml_features(monthly_df)
+        if X is None:
+            return jsonify({
+                'success': False,
+                'error': 'Unable to create features for machine learning',
+                'predictions': []
+            }), 400
+        
+        # Train models
+        models, scalers = train_prediction_models(X, y)
+        if models is None:
+            return jsonify({
+                'success': False,
+                'error': 'Unable to train prediction models',
+                'predictions': []
+            }), 400
+        
+        # Make predictions
+        predictions = predict_future_values(models, scalers, monthly_df, months_ahead)
+        
+        # Calculate model accuracy info
+        model_info = {
+            'data_points_used': len(monthly_df),
+            'months_predicted': len(predictions),
+            'data_range': {
+                'from': str(monthly_df['year_month'].min()),
+                'to': str(monthly_df['year_month'].max())
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'predictions': predictions,
+            'model_info': model_info
+        })
+        
+    except Exception as e:
+        print(f"Error in prediction endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'predictions': []
+        }), 500
 
 if __name__ == "__main__":
     print("Starting minimal Flask app...")

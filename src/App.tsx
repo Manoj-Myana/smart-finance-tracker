@@ -11,6 +11,7 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import Reports from './pages/Reports';
+import Predict from './pages/Predict';
 
 function AppContent() {
   const location = useLocation();
@@ -19,6 +20,7 @@ function AppContent() {
   const isDashboardOrRelatedPage = location.pathname.startsWith('/dashboard') || 
                                    location.pathname.startsWith('/transactions') || 
                                    location.pathname.startsWith('/reports') || 
+                                   location.pathname.startsWith('/predict') || 
                                    location.pathname.startsWith('/analytics') || 
                                    location.pathname.startsWith('/budgets') || 
                                    location.pathname.startsWith('/goals') || 
@@ -38,6 +40,7 @@ function AppContent() {
           <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
           <Route path="/transactions" element={<Layout><Transactions /></Layout>} />
           <Route path="/reports" element={<Layout><Reports /></Layout>} />
+          <Route path="/predict" element={<Layout><Predict /></Layout>} />
           <Route path="/analytics" element={<Layout><div className="text-center py-12"><h2 className="text-2xl font-bold text-gray-600">Analytics Page - Coming Soon</h2></div></Layout>} />
           <Route path="/budgets" element={<Layout><div className="text-center py-12"><h2 className="text-2xl font-bold text-gray-600">Budgets Page - Coming Soon</h2></div></Layout>} />
           <Route path="/goals" element={<Layout><div className="text-center py-12"><h2 className="text-2xl font-bold text-gray-600">Goals Page - Coming Soon</h2></div></Layout>} />
@@ -49,6 +52,7 @@ function AppContent() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/predict" element={<Predict />} />
             <Route path="/analytics" element={<div className="text-center py-12"><h2 className="text-2xl font-bold text-gray-600">Analytics Page - Coming Soon</h2></div>} />
             <Route path="/budgets" element={<div className="text-center py-12"><h2 className="text-2xl font-bold text-gray-600">Budgets Page - Coming Soon</h2></div>} />
             <Route path="/goals" element={<div className="text-center py-12"><h2 className="text-2xl font-bold text-gray-600">Goals Page - Coming Soon</h2></div>} />

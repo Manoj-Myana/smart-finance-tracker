@@ -112,6 +112,7 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
   const navItems = [
     { path: '/transactions', label: 'Transactions' },
     { path: '/reports', label: 'PDF/Excel' },
+    { path: '/predict', label: 'Predict Future Values' },
     { path: '/analytics', label: 'Analytics' },
     { path: '/budgets', label: 'Budgets' },
     { path: '/goals', label: 'Goals' },
