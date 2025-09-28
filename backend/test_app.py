@@ -913,7 +913,7 @@ def prepare_transaction_data_for_ml(transactions_data):
         print(f"Preparing ML data for {len(transactions_data)} transactions")
         
         if not transactions_data:
-            return None
+            return None, None
             
         # Convert to DataFrame
         df = pd.DataFrame(transactions_data)
@@ -921,23 +921,48 @@ def prepare_transaction_data_for_ml(transactions_data):
         # Convert date to datetime
         df['date'] = pd.to_datetime(df['date'])
         
+        # Normalize type and frequency to lowercase for consistent filtering
+        df['type'] = df['type'].str.lower()
+        df['frequency'] = df['frequency'].str.lower()
+        
+        print(f"Transaction types found: {df['type'].unique()}")
+        print(f"Transaction frequencies found: {df['frequency'].unique()}")
+        
         # Extract year-month for grouping
         df['year_month'] = df['date'].dt.to_period('M')
         
-        # Separate income and expenses
+        # Separate all transactions by type
         income_df = df[df['type'] == 'credit'].copy()
         expense_df = df[df['type'] == 'debit'].copy()
         
+        # Separate regular transactions (frequency == 'regular')
+        regular_income_df = income_df[income_df['frequency'] == 'regular'].copy()
+        regular_expense_df = expense_df[expense_df['frequency'] == 'regular'].copy()
+        
+        print(f"Regular income transactions: {len(regular_income_df)}")
+        print(f"Regular expense transactions: {len(regular_expense_df)}")
+        print(f"Total income transactions: {len(income_df)}")
+        print(f"Total expense transactions: {len(expense_df)}")
+        
         # Group by month and calculate totals
         monthly_data = []
+        regular_monthly_data = []
         
         # Get all unique months
         all_months = df['year_month'].unique()
         
         for month in all_months:
+            # All transactions
             month_income = income_df[income_df['year_month'] == month]['amount'].sum()
             month_expense = expense_df[expense_df['year_month'] == month]['amount'].sum()
             month_savings = month_income - month_expense
+            
+            # Regular transactions only
+            regular_month_income = regular_income_df[regular_income_df['year_month'] == month]['amount'].sum()
+            regular_month_expense = regular_expense_df[regular_expense_df['year_month'] == month]['amount'].sum()
+            regular_month_savings = regular_month_income - regular_month_expense
+            
+            print(f"Month {month}: Regular Income={regular_month_income}, Regular Expense={regular_month_expense}, Regular Savings={regular_month_savings}")
             
             monthly_data.append({
                 'year_month': month,
@@ -947,16 +972,30 @@ def prepare_transaction_data_for_ml(transactions_data):
                 'month_numeric': month.month,
                 'year': month.year
             })
+            
+            regular_monthly_data.append({
+                'year_month': month,
+                'income': regular_month_income,
+                'expense': regular_month_expense,
+                'savings': regular_month_savings,
+                'month_numeric': month.month,
+                'year': month.year
+            })
         
         monthly_df = pd.DataFrame(monthly_data)
         monthly_df = monthly_df.sort_values('year_month')
         
+        regular_monthly_df = pd.DataFrame(regular_monthly_data)
+        regular_monthly_df = regular_monthly_df.sort_values('year_month')
+        
         print(f"Prepared {len(monthly_df)} monthly data points for ML")
-        return monthly_df
+        print(f"Prepared {len(regular_monthly_df)} regular monthly data points for ML")
+        print(f"Regular monthly data sample: {regular_monthly_df.head() if len(regular_monthly_df) > 0 else 'No regular data'}")
+        return monthly_df, regular_monthly_df
         
     except Exception as e:
         print(f"Error preparing ML data: {e}")
-        return None
+        return None, None
 
 def create_ml_features(monthly_df):
     """
@@ -1093,6 +1132,59 @@ def predict_future_values(models, scalers, last_month_data, months_ahead=6):
         print(f"Error making predictions: {e}")
         return []
 
+def predict_regular_future_values(models, scalers, last_month_data, months_ahead=6):
+    """
+    Predict future regular income, expense, and savings for the next N months
+    """
+    try:
+        predictions = []
+        
+        # Get the last month info
+        last_sequence = len(last_month_data)
+        current_date = datetime.now()
+        
+        for i in range(1, months_ahead + 1):
+            # Calculate future date
+            future_date = current_date + timedelta(days=30 * i)
+            future_month = future_date.month
+            future_year = future_date.year
+            
+            # Calculate recent trends (use last available data)
+            recent_income_trend = last_month_data['income'].tail(3).mean()
+            recent_expense_trend = last_month_data['expense'].tail(3).mean()
+            
+            # Create features for prediction
+            future_features = np.array([[
+                last_sequence + i,
+                future_month,
+                recent_income_trend,
+                recent_expense_trend
+            ]])
+            
+            # Scale features
+            future_features_scaled = scalers['feature_scaler'].transform(future_features)
+            
+            # Make predictions
+            predicted_income = max(0, models['income'].predict(future_features_scaled)[0])
+            predicted_expense = max(0, models['expense'].predict(future_features_scaled)[0])
+            predicted_savings = predicted_income - predicted_expense
+            
+            predictions.append({
+                'future_date': f"{future_date.strftime('%B')} {future_year}",
+                'month': future_date.strftime('%B'),
+                'year': future_year,
+                'predicted_income': round(predicted_income, 2),
+                'predicted_expense': round(predicted_expense, 2),
+                'predicted_savings': round(predicted_savings, 2)
+            })
+        
+        print(f"Generated {len(predictions)} regular future predictions")
+        return predictions
+        
+    except Exception as e:
+        print(f"Error making regular predictions: {e}")
+        return []
+
 @app.route('/api/predict-future', methods=['POST'])
 def predict_future_financial_values():
     """
@@ -1115,40 +1207,56 @@ def predict_future_financial_values():
         
         print(f"Received {len(transactions)} transactions for prediction")
         
-        # Prepare data for ML
-        monthly_df = prepare_transaction_data_for_ml(transactions)
+        # Prepare data for ML (both all transactions and regular only)
+        monthly_df, regular_monthly_df = prepare_transaction_data_for_ml(transactions)
         if monthly_df is None or len(monthly_df) < 3:
             return jsonify({
                 'success': False,
                 'error': 'Insufficient transaction history for prediction (need at least 3 months)',
-                'predictions': []
+                'predictions': [],
+                'regular_predictions': []
             }), 400
         
-        # Create ML features
+        # Create ML features for all transactions
         X, y = create_ml_features(monthly_df)
         if X is None:
             return jsonify({
                 'success': False,
                 'error': 'Unable to create features for machine learning',
-                'predictions': []
+                'predictions': [],
+                'regular_predictions': []
             }), 400
         
-        # Train models
+        # Train models for all transactions
         models, scalers = train_prediction_models(X, y)
         if models is None:
             return jsonify({
                 'success': False,
                 'error': 'Unable to train prediction models',
-                'predictions': []
+                'predictions': [],
+                'regular_predictions': []
             }), 400
         
-        # Make predictions
+        # Make predictions for all transactions
         predictions = predict_future_values(models, scalers, monthly_df, months_ahead)
+        
+        # Handle regular transactions predictions
+        regular_predictions = []
+        if regular_monthly_df is not None and len(regular_monthly_df) >= 3:
+            # Create ML features for regular transactions
+            X_regular, y_regular = create_ml_features(regular_monthly_df)
+            if X_regular is not None:
+                # Train models for regular transactions
+                regular_models, regular_scalers = train_prediction_models(X_regular, y_regular)
+                if regular_models is not None:
+                    # Make predictions for regular transactions
+                    regular_predictions = predict_regular_future_values(regular_models, regular_scalers, regular_monthly_df, months_ahead)
         
         # Calculate model accuracy info
         model_info = {
             'data_points_used': len(monthly_df),
             'months_predicted': len(predictions),
+            'regular_data_points': len(regular_monthly_df) if regular_monthly_df is not None else 0,
             'data_range': {
                 'from': str(monthly_df['year_month'].min()),
                 'to': str(monthly_df['year_month'].max())
@@ -1158,6 +1266,7 @@ def predict_future_financial_values():
         return jsonify({
             'success': True,
             'predictions': predictions,
+            'regular_predictions': regular_predictions,
             'model_info': model_info
         })
         

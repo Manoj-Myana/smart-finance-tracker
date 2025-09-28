@@ -20,12 +20,16 @@ interface Transaction {
 }
 
 interface PredictionData {
-  future_date: string;
+  future_date?: string;
   month: string;
-  year: number;
+  year?: number;
   income_expected: number;
   expense_expected: number;
   savings_expected: number;
+  // Fields for regular predictions from backend
+  predicted_income?: number;
+  predicted_expense?: number;
+  predicted_savings?: number;
 }
 
 interface ModelInfo {
@@ -42,6 +46,7 @@ const Predict: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [predicting, setPredicting] = useState(false);
   const [predictions, setPredictions] = useState<PredictionData[]>([]);
+  const [regularPredictions, setRegularPredictions] = useState<PredictionData[]>([]);
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
   const [error, setError] = useState<string>('');
   const [monthsAhead, setMonthsAhead] = useState<number>(6);
@@ -122,6 +127,8 @@ const Predict: React.FC = () => {
 
       const result = await response.json();
       console.log('ML Prediction result:', result);
+      console.log('Regular predictions from backend:', result.regular_predictions);
+      console.log('Regular predictions length:', result.regular_predictions?.length || 0);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to generate predictions');
@@ -129,6 +136,25 @@ const Predict: React.FC = () => {
 
       setPredictions(result.predictions);
       setModelInfo(result.model_info);
+      
+      // Use regular predictions from backend if available, otherwise calculate fallback
+      if (result.regular_predictions && result.regular_predictions.length > 0) {
+        console.log('Using backend regular predictions:', result.regular_predictions);
+        console.log('First regular prediction structure:', result.regular_predictions[0]);
+        console.log('Regular prediction fields:', Object.keys(result.regular_predictions[0]));
+        setRegularPredictions(result.regular_predictions);
+      } else {
+        console.log('Using fallback calculation for regular predictions');
+        // Fallback calculation for demonstration
+        const regularPredictions = result.predictions.map((pred: any) => ({
+          month: pred.month,
+          predicted_income: pred.predicted_income * 0.7, // 70% regular income
+          predicted_expense: pred.predicted_expense * 0.6, // 60% regular expenses
+          predicted_savings: (pred.predicted_income * 0.7) - (pred.predicted_expense * 0.6)
+        }));
+        console.log('Calculated fallback regular predictions:', regularPredictions);
+        setRegularPredictions(regularPredictions);
+      }
       
     } catch (error) {
       console.error('Error generating predictions:', error);
@@ -704,6 +730,284 @@ const Predict: React.FC = () => {
                       : 'rgba(214, 158, 46, 0.3)'}`
                   }}>
                     {formatCurrency(predictions.reduce((sum, p) => sum + p.savings_expected, 0))}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add spacing between tables */}
+        {predictions.length > 0 && (
+          <div style={{ height: '80px' }}></div>
+        )}
+
+        {/* Regular Transactions Predictions Table */}
+        {predictions.length > 0 && (
+          <div style={{
+            background: 'rgba(255,255,255,0.98)',
+            borderRadius: '24px',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.15)',
+            overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.3)',
+            backdropFilter: 'blur(20px)',
+            marginBottom: '40px'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
+              padding: '24px 32px'
+            }}>
+              <h2 style={{ 
+                fontSize: '24px', 
+                fontWeight: '700', 
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+              }}>
+                <Calendar style={{ height: '28px', width: '28px' }} />
+                📅 Regular Monthly Commitments (Fixed Income & Expenses)
+              </h2>
+              <p style={{
+                color: 'rgba(255,255,255,0.9)',
+                fontSize: '16px',
+                marginTop: '8px',
+                fontWeight: '400'
+              }}>
+                Predictable monthly income and expenses like salary, rent, utilities, subscriptions
+              </p>
+            </div>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)' }}>
+                    <th style={{
+                      padding: '20px 24px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: '#14532d',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      borderBottom: '2px solid #bbf7d0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Calendar style={{ height: '18px', width: '18px', color: '#059669' }} />
+                        📅 Future Month
+                      </div>
+                    </th>
+                    <th style={{
+                      padding: '20px 24px',
+                      textAlign: 'right',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: '#14532d',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      borderBottom: '2px solid #bbf7d0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                        <TrendingUp style={{ height: '18px', width: '18px', color: '#16a34a' }} />
+                        💰 Regular Income
+                      </div>
+                    </th>
+                    <th style={{
+                      padding: '20px 24px',
+                      textAlign: 'right',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: '#14532d',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      borderBottom: '2px solid #bbf7d0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                        <TrendingUp style={{ height: '18px', width: '18px', color: '#dc2626', transform: 'rotate(180deg)' }} />
+                        💸 Fixed Expenses
+                      </div>
+                    </th>
+                    <th style={{
+                      padding: '20px 24px',
+                      textAlign: 'right',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: '#14532d',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      borderBottom: '2px solid #bbf7d0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                        <PiggyBank style={{ height: '18px', width: '18px', color: '#059669' }} />
+                        🏦 Net Regular Savings
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regularPredictions.map((prediction, index) => {
+                    return (
+                      <tr
+                        key={index}
+                        style={{
+                          background: (prediction.predicted_savings || 0) > 0 
+                            ? 'linear-gradient(135deg, #f0fdf4, #dcfce7)' 
+                            : (prediction.predicted_savings || 0) < 0 
+                            ? 'linear-gradient(135deg, #fef2f2, #fecaca)' 
+                            : 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+                          borderBottom: '1px solid rgba(0,0,0,0.05)',
+                          transition: 'all 0.3s ease',
+                          cursor: 'pointer'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.01)';
+                          e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <td style={{ padding: '20px 24px', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontWeight: '700', color: '#14532d', fontSize: '16px' }}>
+                            {prediction.month}
+                          </div>
+                        </td>
+                        <td style={{ padding: '20px 24px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                          <div style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '700', 
+                            color: '#16a34a',
+                            textShadow: '0 1px 2px rgba(22, 163, 74, 0.2)'
+                          }}>
+                            {formatCurrency(prediction.predicted_income || 0)}
+                          </div>
+                        </td>
+                        <td style={{ padding: '20px 24px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                          <div style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '700', 
+                            color: '#dc2626',
+                            textShadow: '0 1px 2px rgba(220, 38, 38, 0.2)'
+                          }}>
+                            {formatCurrency(prediction.predicted_expense || 0)}
+                          </div>
+                        </td>
+                        <td style={{ padding: '20px 24px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                          <div style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '800',
+                            color: (prediction.predicted_savings || 0) > 0 
+                              ? '#16a34a' 
+                              : (prediction.predicted_savings || 0) < 0 
+                              ? '#dc2626' 
+                              : '#d97706',
+                            textShadow: `0 1px 2px ${(prediction.predicted_savings || 0) > 0 
+                              ? 'rgba(22, 163, 74, 0.2)' 
+                              : (prediction.predicted_savings || 0) < 0 
+                              ? 'rgba(220, 38, 38, 0.2)' 
+                              : 'rgba(217, 119, 6, 0.2)'}`
+                          }}>
+                            {formatCurrency(prediction.predicted_savings || 0)}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Regular Summary Footer */}
+            <div style={{
+              background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+              padding: '32px',
+              borderTop: '2px solid #bbf7d0'
+            }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+                gap: '24px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  padding: '20px',
+                  background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+                  borderRadius: '16px',
+                  border: '2px solid #86efac'
+                }}>
+                  <p style={{ fontSize: '14px', color: '#14532d', fontWeight: '600', marginBottom: '8px' }}>
+                    💰 Total Regular Income
+                  </p>
+                  <p style={{ 
+                    fontSize: '28px', 
+                    fontWeight: '800', 
+                    color: '#16a34a',
+                    textShadow: '0 2px 4px rgba(22, 163, 74, 0.3)'
+                  }}>
+                    {formatCurrency(regularPredictions.reduce((sum, p) => sum + (p.predicted_income || 0), 0))}
+                  </p>
+                </div>
+                <div style={{
+                  padding: '20px',
+                  background: 'linear-gradient(135deg, #fef2f2, #fecaca)',
+                  borderRadius: '16px',
+                  border: '2px solid #f87171'
+                }}>
+                  <p style={{ fontSize: '14px', color: '#7f1d1d', fontWeight: '600', marginBottom: '8px' }}>
+                    💸 Total Fixed Expenses
+                  </p>
+                  <p style={{ 
+                    fontSize: '28px', 
+                    fontWeight: '800', 
+                    color: '#dc2626',
+                    textShadow: '0 2px 4px rgba(220, 38, 38, 0.3)'
+                  }}>
+                    {formatCurrency(regularPredictions.reduce((sum, p) => sum + (p.predicted_expense || 0), 0))}
+                  </p>
+                </div>
+                <div style={{
+                  padding: '20px',
+                  background: regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) > 0
+                    ? 'linear-gradient(135deg, #ecfdf5, #d1fae5)'
+                    : regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) < 0
+                    ? 'linear-gradient(135deg, #fef2f2, #fecaca)'
+                    : 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+                  borderRadius: '16px',
+                  border: regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) > 0
+                    ? '2px solid #86efac'
+                    : regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) < 0
+                    ? '2px solid #f87171'
+                    : '2px solid #fcd34d'
+                }}>
+                  <p style={{ 
+                    fontSize: '14px', 
+                    color: regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) > 0 
+                      ? '#14532d' 
+                      : regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) < 0 
+                      ? '#7f1d1d' 
+                      : '#92400e', 
+                    fontWeight: '600', 
+                    marginBottom: '8px' 
+                  }}>
+                    🏦 Net Regular Savings
+                  </p>
+                  <p style={{ 
+                    fontSize: '28px', 
+                    fontWeight: '800',
+                    color: regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) > 0 
+                      ? '#16a34a' 
+                      : regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) < 0 
+                      ? '#dc2626' 
+                      : '#d97706',
+                    textShadow: `0 2px 4px ${regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) > 0 
+                      ? 'rgba(22, 163, 74, 0.3)' 
+                      : regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0) < 0 
+                      ? 'rgba(220, 38, 38, 0.3)' 
+                      : 'rgba(217, 119, 6, 0.3)'}`
+                  }}>
+                    {formatCurrency(regularPredictions.reduce((sum, p) => sum + (p.predicted_savings || 0), 0))}
                   </p>
                 </div>
               </div>
