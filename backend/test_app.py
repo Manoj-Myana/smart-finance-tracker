@@ -1145,50 +1145,17 @@ def predict_future_values(models, scalers, last_month_data, months_ahead=6):
 def predict_regular_future_values(models, scalers, last_month_data, months_ahead=6):
     """
     Predict future regular income, expense, and savings for the next N months
-    Using simple trend analysis instead of complex ML to avoid scaling issues
+    Using complex ML models with fallback to simple trend analysis
     """
     try:
         predictions = []
         
-        if len(last_month_data) < 2:
-            # If insufficient data, return zero predictions
-            current_date = datetime.now()
-            for i in range(1, months_ahead + 1):
-                future_date = current_date + timedelta(days=30 * i)
-                predictions.append({
-                    'future_date': f"{future_date.strftime('%B')} {future_date.year}",
-                    'month': future_date.strftime('%B'),
-                    'year': future_date.year,
-                    'predicted_income': 0.0,
-                    'predicted_expense': 0.0,
-                    'predicted_savings': 0.0
-                })
-            return predictions
-        
-        # Calculate simple averages and trends from recent data
-        recent_data = last_month_data.tail(min(6, len(last_month_data)))  # Use last 6 months or available data
-        
-        # Calculate averages
-        avg_income = recent_data['income'].mean()
-        avg_expense = recent_data['expense'].mean()
-        
-        # Calculate simple trend (difference between recent and older data)
-        if len(recent_data) >= 3:
-            recent_avg_income = recent_data['income'].tail(3).mean()
-            older_avg_income = recent_data['income'].head(3).mean() if len(recent_data) >= 6 else recent_avg_income
-            income_trend = (recent_avg_income - older_avg_income) / max(3, len(recent_data) - 3)
-            
-            recent_avg_expense = recent_data['expense'].tail(3).mean()
-            older_avg_expense = recent_data['expense'].head(3).mean() if len(recent_data) >= 6 else recent_avg_expense
-            expense_trend = (recent_avg_expense - older_avg_expense) / max(3, len(recent_data) - 3)
-        else:
-            income_trend = 0
-            expense_trend = 0
-        
-        print(f"Average income: {avg_income}, Average expense: {avg_expense}")
-        print(f"Income trend: {income_trend}, Expense trend: {expense_trend}")
-        
+        # Get the last month info
+        last_sequence = len(last_month_data)
         current_date = datetime.now()
+        
+        # Check if we have enough data and the ML model is producing reasonable results
+        use_ml_model = True
         
         for i in range(1, months_ahead + 1):
             # Calculate future date
@@ -1196,23 +1163,106 @@ def predict_regular_future_values(models, scalers, last_month_data, months_ahead
             future_month = future_date.month
             future_year = future_date.year
             
-            # Simple trend-based prediction
-            predicted_income = max(0, avg_income + (income_trend * i))
-            predicted_expense = max(0, avg_expense + (expense_trend * i))
-            predicted_savings = predicted_income - predicted_expense
-            
-            print(f"Month {i}: Income={predicted_income:.2f}, Expense={predicted_expense:.2f}, Savings={predicted_savings:.2f}")
-            
-            predictions.append({
-                'future_date': f"{future_date.strftime('%B')} {future_year}",
-                'month': future_date.strftime('%B'),
-                'year': future_year,
-                'predicted_income': round(predicted_income, 2),
-                'predicted_expense': round(predicted_expense, 2),
-                'predicted_savings': round(predicted_savings, 2)
-            })
+            if use_ml_model:
+                try:
+                    # Calculate recent trends (use last available data)
+                    recent_income_trend = last_month_data['income'].tail(3).mean()
+                    recent_expense_trend = last_month_data['expense'].tail(3).mean()
+                    
+                    # Create features for prediction
+                    future_features = np.array([[
+                        last_sequence + i,
+                        future_month,
+                        recent_income_trend,
+                        recent_expense_trend
+                    ]])
+                    
+                    print(f"ML Features for month {i}: {future_features}")
+                    
+                    # Scale features
+                    future_features_scaled = scalers['feature_scaler'].transform(future_features)
+                    print(f"Scaled features: {future_features_scaled}")
+                    
+                    # Make predictions using complex ML models
+                    predicted_income = max(0, models['income'].predict(future_features_scaled)[0])
+                    predicted_expense = max(0, models['expense'].predict(future_features_scaled)[0])
+                    
+                    # Check if ML predictions are reasonable (not zero income and reasonable expense)
+                    if predicted_income < 100 or predicted_expense > predicted_income * 2:
+                        print(f"ML predictions seem unreasonable for regular transactions, falling back to trend analysis")
+                        use_ml_model = False
+                        # Fall back to trend analysis for this and remaining predictions
+                        break
+                    
+                    predicted_savings = predicted_income - predicted_expense
+                    
+                    print(f"ML Predictions for month {i}: Income={predicted_income:.2f}, Expense={predicted_expense:.2f}, Savings={predicted_savings:.2f}")
+                    
+                    predictions.append({
+                        'future_date': f"{future_date.strftime('%B')} {future_year}",
+                        'month': future_date.strftime('%B'),
+                        'year': future_year,
+                        'predicted_income': round(predicted_income, 2),
+                        'predicted_expense': round(predicted_expense, 2),
+                        'predicted_savings': round(predicted_savings, 2)
+                    })
+                    
+                except Exception as e:
+                    print(f"ML prediction failed for month {i}: {e}")
+                    use_ml_model = False
+                    break
         
-        print(f"Generated {len(predictions)} regular future predictions using simple trend analysis")
+        # If ML model failed or produced unreasonable results, use trend analysis
+        if not use_ml_model:
+            print("Falling back to trend-based analysis for regular predictions")
+            
+            # Clear previous predictions if any
+            predictions = []
+            
+            # Calculate simple averages and trends from recent data
+            recent_data = last_month_data.tail(min(6, len(last_month_data)))
+            
+            # Calculate averages
+            avg_income = recent_data['income'].mean()
+            avg_expense = recent_data['expense'].mean()
+            
+            # Calculate simple trend
+            if len(recent_data) >= 3:
+                recent_avg_income = recent_data['income'].tail(3).mean()
+                older_avg_income = recent_data['income'].head(3).mean() if len(recent_data) >= 6 else recent_avg_income
+                income_trend = (recent_avg_income - older_avg_income) / max(3, len(recent_data) - 3)
+                
+                recent_avg_expense = recent_data['expense'].tail(3).mean()
+                older_avg_expense = recent_data['expense'].head(3).mean() if len(recent_data) >= 6 else recent_avg_expense
+                expense_trend = (recent_avg_expense - older_avg_expense) / max(3, len(recent_data) - 3)
+            else:
+                income_trend = 0
+                expense_trend = 0
+            
+            print(f"Trend Analysis - Average income: {avg_income}, Average expense: {avg_expense}")
+            print(f"Income trend: {income_trend}, Expense trend: {expense_trend}")
+            
+            for i in range(1, months_ahead + 1):
+                future_date = current_date + timedelta(days=30 * i)
+                future_year = future_date.year
+                
+                # Trend-based prediction
+                predicted_income = max(0, avg_income + (income_trend * i))
+                predicted_expense = max(0, avg_expense + (expense_trend * i))
+                predicted_savings = predicted_income - predicted_expense
+                
+                print(f"Trend Prediction for month {i}: Income={predicted_income:.2f}, Expense={predicted_expense:.2f}, Savings={predicted_savings:.2f}")
+                
+                predictions.append({
+                    'future_date': f"{future_date.strftime('%B')} {future_year}",
+                    'month': future_date.strftime('%B'),
+                    'year': future_year,
+                    'predicted_income': round(predicted_income, 2),
+                    'predicted_expense': round(predicted_expense, 2),
+                    'predicted_savings': round(predicted_savings, 2)
+                })
+        
+        print(f"Generated {len(predictions)} regular future predictions using {'complex ML models' if use_ml_model else 'trend analysis'}")
         return predictions
         
     except Exception as e:
@@ -1279,19 +1329,19 @@ def predict_future_financial_values():
                 'regular_predictions': []
             }), 400
         
-        # Make predictions for all transactions - use the same reliable algorithm as regular predictions
-        predictions = predict_regular_future_values(models, scalers, monthly_df, months_ahead)
+        # Make predictions for all transactions using complex ML models
+        predictions = predict_future_values(models, scalers, monthly_df, months_ahead)
         
-        # Convert field names from regular format to main predictions format
+        # Convert field names from main predictions format to expected format
         main_predictions = []
         for pred in predictions:
             main_predictions.append({
                 'future_date': pred['future_date'],
                 'month': pred['month'], 
                 'year': pred['year'],
-                'income_expected': pred['predicted_income'],
-                'expense_expected': pred['predicted_expense'],
-                'savings_expected': pred['predicted_savings']
+                'income_expected': pred['income_expected'],
+                'expense_expected': pred['expense_expected'],
+                'savings_expected': pred['savings_expected']
             })
         
         predictions = main_predictions
