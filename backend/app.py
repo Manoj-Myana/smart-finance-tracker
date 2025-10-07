@@ -347,6 +347,151 @@ def get_transactions():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route("/api/transactions/<int:user_id>", methods=["GET"])
+def get_user_transactions(user_id):
+    """
+    Get transactions for a specific user
+    """
+    try:
+        # For demo purposes, return sample transaction data
+        sample_transactions = [
+            {
+                'id': 1,
+                'user_id': user_id,
+                'date': '2024-01-15',
+                'description': 'Salary Credit',
+                'amount': 5000.00,
+                'type': 'credit',
+                'frequency': 'regular',
+                'created_at': '2024-01-15T10:00:00'
+            },
+            {
+                'id': 2,
+                'user_id': user_id,
+                'date': '2024-01-16',
+                'description': 'Grocery Shopping',
+                'amount': 150.00,
+                'type': 'debit',
+                'frequency': 'regular',
+                'created_at': '2024-01-16T14:30:00'
+            },
+            {
+                'id': 3,
+                'user_id': user_id,
+                'date': '2024-01-18',
+                'description': 'Utility Bill Payment',
+                'amount': 200.00,
+                'type': 'debit',
+                'frequency': 'regular',
+                'created_at': '2024-01-18T09:15:00'
+            },
+            {
+                'id': 4,
+                'user_id': user_id,
+                'date': '2024-02-15',
+                'description': 'Salary Credit',
+                'amount': 5000.00,
+                'type': 'credit',
+                'frequency': 'regular',
+                'created_at': '2024-02-15T10:00:00'
+            },
+            {
+                'id': 5,
+                'user_id': user_id,
+                'date': '2024-02-20',
+                'description': 'Restaurant Bill',
+                'amount': 75.00,
+                'type': 'debit',
+                'frequency': 'irregular',
+                'created_at': '2024-02-20T19:45:00'
+            },
+            {
+                'id': 6,
+                'user_id': user_id,
+                'date': '2024-03-15',
+                'description': 'Salary Credit',
+                'amount': 5000.00,
+                'type': 'credit',
+                'frequency': 'regular',
+                'created_at': '2024-03-15T10:00:00'
+            },
+            {
+                'id': 7,
+                'user_id': user_id,
+                'date': '2024-03-22',
+                'description': 'Gas Bill',
+                'amount': 80.00,
+                'type': 'debit',
+                'frequency': 'regular',
+                'created_at': '2024-03-22T11:20:00'
+            },
+            {
+                'id': 8,
+                'user_id': user_id,
+                'date': '2024-04-15',
+                'description': 'Salary Credit',
+                'amount': 5000.00,
+                'type': 'credit',
+                'frequency': 'regular',
+                'created_at': '2024-04-15T10:00:00'
+            },
+            {
+                'id': 9,
+                'user_id': user_id,
+                'date': '2024-04-25',
+                'description': 'Entertainment Expense',
+                'amount': 120.00,
+                'type': 'debit',
+                'frequency': 'irregular',
+                'created_at': '2024-04-25T16:30:00'
+            },
+            {
+                'id': 10,
+                'user_id': user_id,
+                'date': '2024-05-15',
+                'description': 'Salary Credit',
+                'amount': 5000.00,
+                'type': 'credit',
+                'frequency': 'regular',
+                'created_at': '2024-05-15T10:00:00'
+            },
+            {
+                'id': 11,
+                'user_id': user_id,
+                'date': '2024-05-28',
+                'description': 'Medical Expense',
+                'amount': 300.00,
+                'type': 'debit',
+                'frequency': 'irregular',
+                'created_at': '2024-05-28T13:15:00'
+            },
+            {
+                'id': 12,
+                'user_id': user_id,
+                'date': '2024-06-15',
+                'description': 'Salary Credit',
+                'amount': 5000.00,
+                'type': 'credit',
+                'frequency': 'regular',
+                'created_at': '2024-06-15T10:00:00'
+            },
+            {
+                'id': 13,
+                'user_id': user_id,
+                'date': '2024-06-30',
+                'description': 'Transportation',
+                'amount': 45.00,
+                'type': 'debit',
+                'frequency': 'regular',
+                'created_at': '2024-06-30T08:45:00'
+            }
+        ]
+        
+        return jsonify(sample_transactions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route("/api/transactions", methods=["POST"])
 def save_transactions():
     """

@@ -1,16 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { Provider } from 'react-redux';
-import { store } from './store';
-import HomeNavbar from './components/HomeNavbar';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
-import Transactions from './pages/Transactions';
-import Reports from './pages/Reports';
-import Predict from './pages/Predict';
 import {
   PieChart,
   Pie,
@@ -38,7 +26,6 @@ const COLORS = {
   irregular: '#F59E0B'
 };
 
-// Analytics Component with Real Database Data
 const Analytics: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -441,38 +428,4 @@ const Analytics: React.FC = () => {
   );
 };
 
-function AppContent() {
-  const location = useLocation();
-  const isHomePage = location.pathname === '/';
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {!isAuthPage && <HomeNavbar isHomePage={isHomePage} />}
-      
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-        <Route path="/transactions" element={<Layout><Transactions /></Layout>} />
-        <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
-        <Route path="/reports" element={<Layout><Reports /></Layout>} />
-        <Route path="/predict" element={<Layout><Predict /></Layout>} />
-        <Route path="/goals" element={<Layout><div className="text-center py-12"><h2 className="text-2xl font-bold text-gray-600">Goals Page - Coming Soon</h2></div></Layout>} />
-      </Routes>
-    </div>
-  );
-}
-
-function App() {
-  return (
-    <Provider store={store}>
-      <Router>
-        <AppContent />
-      </Router>
-    </Provider>
-  );
-}
-
-export default App;
+export default Analytics;
