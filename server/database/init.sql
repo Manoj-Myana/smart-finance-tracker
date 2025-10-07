@@ -50,6 +50,18 @@ CREATE TABLE IF NOT EXISTS transactions (
     FOREIGN KEY (accountId) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
+-- Goals table
+CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    target_date DATE NOT NULL,
+    description TEXT NOT NULL,
+    amount DECIMAL(15, 2) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_userId ON user_sessions(userId);
@@ -58,3 +70,5 @@ CREATE INDEX IF NOT EXISTS idx_accounts_userId ON accounts(userId);
 CREATE INDEX IF NOT EXISTS idx_transactions_userId ON transactions(userId);
 CREATE INDEX IF NOT EXISTS idx_transactions_accountId ON transactions(accountId);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transactionDate);
+CREATE INDEX IF NOT EXISTS idx_goals_userId ON goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_goals_target_date ON goals(target_date);

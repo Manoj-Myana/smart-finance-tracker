@@ -55,6 +55,17 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    target_date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
 });
 
 // Middleware
@@ -70,7 +81,11 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
+  console.log('DEBUG - Auth Header:', authHeader);
+  console.log('DEBUG - Extracted Token:', token);
+
   if (!token) {
+    console.log('DEBUG - No token provided');
     return res.status(401).json({ 
       success: false, 
       message: 'Access token is required' 
@@ -79,11 +94,13 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.log('DEBUG - JWT verification error:', err.message);
       return res.status(403).json({ 
         success: false, 
         message: 'Invalid or expired token' 
       });
     }
+    console.log('DEBUG - JWT verification successful, user:', user);
     req.user = user;
     next();
   });
@@ -775,6 +792,444 @@ app.delete('/api/transactions/:id', authenticateToken, (req, res) => {
       message: 'Internal server error'
     });
   }
+});
+// Goals endpoints
+// Get all goals for a user
+app.get('/api/goals/:userId', authenticateToken, (req, res) => {
+  const { userId } = req.params;
+  const userIdFromToken = req.user.userId; // Fixed: use userId instead of id
+
+  // Ensure user can only access their own goals
+  if (parseInt(userId) !== userIdFromToken) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied'
+    });
+  }
+
+  db.all(
+    'SELECT * FROM goals WHERE user_id = ? ORDER BY target_date ASC',
+    [userId],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching goals:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch goals'
+        });
+      }
+      
+      res.json({
+        success: true,
+        goals: rows
+      });
+    }
+  );
+});
+
+// Add a new goal
+app.post('/api/goals', authenticateToken, (req, res) => {
+  const { user_id, target_date, description, amount } = req.body;
+  const userIdFromToken = req.user.userId; // Fixed: use userId instead of id
+
+  // Ensure user can only create goals for themselves
+  if (parseInt(user_id) !== userIdFromToken) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied'
+    });
+  }
+
+  // Validation
+  if (!user_id || !target_date || !description || !amount) {
+    return res.status(400).json({
+      success: false,
+      message: 'All fields are required'
+    });
+  }
+
+  if (isNaN(amount) || parseFloat(amount) <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Amount must be a positive number'
+    });
+  }
+
+  db.run(
+    'INSERT INTO goals (user_id, target_date, description, amount, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+    [user_id, target_date, description, parseFloat(amount)],
+    function(err) {
+      if (err) {
+        console.error('Error adding goal:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to add goal'
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: 'Goal added successfully',
+        goalId: this.lastID
+      });
+    }
+  );
+});
+
+// Update a goal
+app.put('/api/goals/:goalId', authenticateToken, (req, res) => {
+  const { goalId } = req.params;
+  const { target_date, description, amount } = req.body;
+  const userIdFromToken = req.user.userId; // Fixed: use userId instead of id
+
+  // Validation
+  if (!target_date || !description || !amount) {
+    return res.status(400).json({
+      success: false,
+      message: 'All fields are required'
+    });
+  }
+
+  if (isNaN(amount) || parseFloat(amount) <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Amount must be a positive number'
+    });
+  }
+
+  // First check if the goal belongs to the user
+  db.get(
+    'SELECT user_id FROM goals WHERE id = ?',
+    [goalId],
+    (err, row) => {
+      if (err) {
+        console.error('Error checking goal ownership:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: 'Goal not found'
+        });
+      }
+
+      if (row.user_id !== userIdFromToken) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Update the goal
+      db.run(
+        'UPDATE goals SET target_date = ?, description = ?, amount = ?, updated_at = datetime("now") WHERE id = ?',
+        [target_date, description, parseFloat(amount), goalId],
+        function(err) {
+          if (err) {
+            console.error('Error updating goal:', err);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to update goal'
+            });
+          }
+          
+          res.json({
+            success: true,
+            message: 'Goal updated successfully'
+          });
+        }
+      );
+    }
+  );
+});
+
+// Delete a goal
+app.delete('/api/goals/:goalId', authenticateToken, (req, res) => {
+  const { goalId } = req.params;
+  const userIdFromToken = req.user.userId; // Fixed: use userId instead of id
+
+  // First check if the goal belongs to the user
+  db.get(
+    'SELECT user_id FROM goals WHERE id = ?',
+    [goalId],
+    (err, row) => {
+      if (err) {
+        console.error('Error checking goal ownership:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: 'Goal not found'
+        });
+      }
+
+      if (row.user_id !== userIdFromToken) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Delete the goal
+      db.run(
+        'DELETE FROM goals WHERE id = ?',
+        [goalId],
+        function(err) {
+          if (err) {
+            console.error('Error deleting goal:', err);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to delete goal'
+            });
+          }
+          
+          res.json({
+            success: true,
+            message: 'Goal deleted successfully'
+          });
+        }
+      );
+    }
+  );
+});
+
+// ===== GOALS ENDPOINTS =====
+
+// Get all goals for a user
+app.get('/api/goals/:userId', authenticateToken, (req, res) => {
+  const { userId } = req.params;
+  const user = req.user;
+
+  // Check if user is accessing their own goals
+  if (parseInt(userId) !== user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied'
+    });
+  }
+
+  db.all(
+    'SELECT * FROM goals WHERE user_id = ? ORDER BY target_date ASC',
+    [userId],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching goals:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch goals'
+        });
+      }
+
+      res.json({
+        success: true,
+        goals: rows
+      });
+    }
+  );
+});
+
+// Add a new goal
+app.post('/api/goals', authenticateToken, (req, res) => {
+  const { user_id, target_date, description, amount } = req.body;
+  const user = req.user;
+
+  // Check if user is adding goal for themselves
+  if (parseInt(user_id) !== user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied'
+    });
+  }
+
+  // Validation
+  if (!user_id || !target_date || !description || !amount) {
+    return res.status(400).json({
+      success: false,
+      message: 'All fields are required'
+    });
+  }
+
+  if (isNaN(amount) || parseFloat(amount) <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Amount must be a positive number'
+    });
+  }
+
+  db.run(
+    'INSERT INTO goals (user_id, target_date, description, amount, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+    [user_id, target_date, description, parseFloat(amount)],
+    function(err) {
+      if (err) {
+        console.error('Error adding goal:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to add goal'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Goal added successfully',
+        goalId: this.lastID
+      });
+    }
+  );
+});
+
+// Update a goal
+app.put('/api/goals/:goalId', authenticateToken, (req, res) => {
+  const { goalId } = req.params;
+  const { target_date, description, amount } = req.body;
+  const user = req.user;
+
+  // First check if the goal belongs to the user
+  db.get(
+    'SELECT user_id FROM goals WHERE id = ?',
+    [goalId],
+    (err, goal) => {
+      if (err) {
+        console.error('Error checking goal ownership:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+
+      if (!goal) {
+        return res.status(404).json({
+          success: false,
+          message: 'Goal not found'
+        });
+      }
+
+      if (goal.user_id !== user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Validation
+      if (!target_date || !description || !amount) {
+        return res.status(400).json({
+          success: false,
+          message: 'All fields are required'
+        });
+      }
+
+      if (isNaN(amount) || parseFloat(amount) <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Amount must be a positive number'
+        });
+      }
+
+      // Update the goal
+      db.run(
+        'UPDATE goals SET target_date = ?, description = ?, amount = ?, updated_at = datetime("now") WHERE id = ?',
+        [target_date, description, parseFloat(amount), goalId],
+        function(err) {
+          if (err) {
+            console.error('Error updating goal:', err);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to update goal'
+            });
+          }
+
+          res.json({
+            success: true,
+            message: 'Goal updated successfully'
+          });
+        }
+      );
+    }
+  );
+});
+
+// Delete a goal
+app.delete('/api/goals/:goalId', authenticateToken, (req, res) => {
+  const { goalId } = req.params;
+  const user = req.user;
+
+  // First check if the goal belongs to the user
+  db.get(
+    'SELECT user_id FROM goals WHERE id = ?',
+    [goalId],
+    (err, goal) => {
+      if (err) {
+        console.error('Error checking goal ownership:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Internal server error'
+        });
+      }
+
+      if (!goal) {
+        return res.status(404).json({
+          success: false,
+          message: 'Goal not found'
+        });
+      }
+
+      if (goal.user_id !== user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Delete the goal
+      db.run(
+        'DELETE FROM goals WHERE id = ?',
+        [goalId],
+        function(err) {
+          if (err) {
+            console.error('Error deleting goal:', err);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to delete goal'
+            });
+          }
+
+          res.json({
+            success: true,
+            message: 'Goal deleted successfully'
+          });
+        }
+      );
+    }
+  );
+});
+
+// Test authentication endpoint
+app.get('/api/test-auth', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Authentication working!',
+    user: req.user
+  });
+});
+
+// Test endpoint to list all users (for debugging)
+app.get('/api/debug/users', (req, res) => {
+  db.all('SELECT id, fullName, email, createdAt FROM users', [], (err, rows) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ success: false, message: 'Database error' });
+    }
+    res.json({ success: true, users: rows });
+  });
 });
 
 // Health check endpoint
