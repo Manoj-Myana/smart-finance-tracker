@@ -114,9 +114,8 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
     { path: '/reports', label: 'PDF/Excel' },
     { path: '/predict', label: 'Predict Future Values' },
     { path: '/analytics', label: 'Analytics' },
-    { path: '/budgets', label: 'Budgets' },
     { path: '/goals', label: 'Goals' },
-    { path: '/settings', label: 'Settings' },
+    { path: '/ai-suggestions', label: 'AI Suggestions' },
   ];
 
   return (

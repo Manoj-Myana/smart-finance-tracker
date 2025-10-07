@@ -13,6 +13,7 @@ import Analytics from "./pages/Analytics";
 import Reports from "./pages/Reports";
 import Predict from "./pages/Predict";
 import Goals from "./pages/Goals";
+import AiSuggestions from "./pages/AiSuggestions";
 
 function AppContent() {
   const location = useLocation();
@@ -32,6 +33,7 @@ function AppContent() {
         <Route path="/reports" element={<Layout><Reports /></Layout>} />
         <Route path="/predict" element={<Layout><Predict /></Layout>} />
         <Route path="/goals" element={<Layout><Goals /></Layout>} />
+        <Route path="/ai-suggestions" element={<Layout><AiSuggestions /></Layout>} />
       </Routes>
     </div>
   );
