@@ -377,7 +377,7 @@ const Transactions: React.FC = () => {
     return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
   });
 
-  // Calculate totals
+  // Calculate totals for all transactions
   const totalCredit = transactions
     .filter(t => t.type === 'credit')
     .reduce((sum, t) => sum + t.amount, 0);
@@ -387,6 +387,17 @@ const Transactions: React.FC = () => {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const balance = totalCredit - totalDebit;
+
+  // Calculate totals for filtered transactions
+  const filteredTotalCredit = filteredTransactions
+    .filter(t => t.type === 'credit')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const filteredTotalDebit = filteredTransactions
+    .filter(t => t.type === 'debit')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const filteredBalance = filteredTotalCredit - filteredTotalDebit;
 
   if (loading) {
     return (
@@ -1084,6 +1095,387 @@ const Transactions: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Filtered Summary Section */}
+              {(searchTerm || filter !== 'all' || frequencyFilter !== 'all' || dateFilterType !== 'all' || amountGreaterThan || amountLessThan || sortBy !== 'none') && (
+                <div 
+                  style={{
+                    marginTop: '20px',
+                    padding: '20px',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    backgroundColor: 'rgba(239, 246, 255, 0.8)',
+                    backgroundImage: 'linear-gradient(135deg, rgba(239, 246, 255, 0.9) 0%, rgba(219, 234, 254, 0.8) 100%)',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h3 style={{ 
+                      fontSize: '18px', 
+                      fontWeight: '700', 
+                      color: '#1f2937',
+                      margin: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span style={{ 
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}>
+                        📊
+                      </span>
+                      Filtered Results Summary
+                    </h3>
+                    <div style={{
+                      padding: '4px 12px',
+                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#3b82f6'
+                    }}>
+                      {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} found
+                    </div>
+                  </div>
+
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                    gap: '16px' 
+                  }}>
+                    {/* Filtered Total Income */}
+                    <div style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '0',
+                        left: '0',
+                        width: '100%',
+                        height: '3px',
+                        backgroundColor: '#10b981',
+                        backgroundImage: 'linear-gradient(90deg, #10b981, #34d399)'
+                      }}></div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{
+                          backgroundColor: '#10b981',
+                          color: 'white',
+                          borderRadius: '8px',
+                          padding: '6px',
+                          marginRight: '8px'
+                        }}>
+                          <ArrowUpRight style={{ width: '16px', height: '16px' }} />
+                        </div>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          fontWeight: '600', 
+                          color: '#065f46',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          Total Income
+                        </span>
+                      </div>
+                      <div style={{ 
+                        fontSize: '24px', 
+                        fontWeight: '800', 
+                        color: '#065f46',
+                        marginBottom: '4px'
+                      }}>
+                        {formatCurrency(filteredTotalCredit)}
+                      </div>
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: '#047857',
+                        fontWeight: '500'
+                      }}>
+                        from {filteredTransactions.filter(t => t.type === 'credit').length} credit transaction{filteredTransactions.filter(t => t.type === 'credit').length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+
+                    {/* Filtered Total Expenditure */}
+                    <div style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '0',
+                        left: '0',
+                        width: '100%',
+                        height: '3px',
+                        backgroundColor: '#ef4444',
+                        backgroundImage: 'linear-gradient(90deg, #ef4444, #f87171)'
+                      }}></div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          borderRadius: '8px',
+                          padding: '6px',
+                          marginRight: '8px'
+                        }}>
+                          <ArrowDownRight style={{ width: '16px', height: '16px' }} />
+                        </div>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          fontWeight: '600', 
+                          color: '#7f1d1d',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          Total Expenditure
+                        </span>
+                      </div>
+                      <div style={{ 
+                        fontSize: '24px', 
+                        fontWeight: '800', 
+                        color: '#7f1d1d',
+                        marginBottom: '4px'
+                      }}>
+                        {formatCurrency(filteredTotalDebit)}
+                      </div>
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: '#991b1b',
+                        fontWeight: '500'
+                      }}>
+                        from {filteredTransactions.filter(t => t.type === 'debit').length} debit transaction{filteredTransactions.filter(t => t.type === 'debit').length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+
+                    {/* Filtered Net Balance */}
+                    <div style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      backgroundColor: filteredBalance >= 0 ? 'rgba(59, 130, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                      border: `1px solid ${filteredBalance >= 0 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`,
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '0',
+                        left: '0',
+                        width: '100%',
+                        height: '3px',
+                        backgroundColor: filteredBalance >= 0 ? '#3b82f6' : '#f59e0b',
+                        backgroundImage: filteredBalance >= 0 
+                          ? 'linear-gradient(90deg, #3b82f6, #60a5fa)' 
+                          : 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+                      }}></div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{
+                          backgroundColor: filteredBalance >= 0 ? '#3b82f6' : '#f59e0b',
+                          color: 'white',
+                          borderRadius: '8px',
+                          padding: '6px',
+                          marginRight: '8px'
+                        }}>
+                          <DollarSign style={{ width: '16px', height: '16px' }} />
+                        </div>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          fontWeight: '600', 
+                          color: filteredBalance >= 0 ? '#1e3a8a' : '#92400e',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          Net Balance
+                        </span>
+                      </div>
+                      <div style={{ 
+                        fontSize: '24px', 
+                        fontWeight: '800', 
+                        color: filteredBalance >= 0 ? '#1e3a8a' : '#92400e',
+                        marginBottom: '4px'
+                      }}>
+                        {formatCurrency(Math.abs(filteredBalance))}
+                      </div>
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: filteredBalance >= 0 ? '#1e40af' : '#b45309',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}>
+                        <span style={{
+                          backgroundColor: filteredBalance >= 0 ? '#22c55e' : '#ef4444',
+                          color: 'white',
+                          borderRadius: '50%',
+                          width: '12px',
+                          height: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '8px'
+                        }}>
+                          {filteredBalance >= 0 ? '↗' : '↘'}
+                        </span>
+                        {filteredBalance >= 0 ? 'Positive' : 'Negative'} balance
+                      </div>
+                    </div>
+
+                    {/* Savings Rate */}
+                    <div style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(139, 69, 193, 0.1)',
+                      border: '1px solid rgba(139, 69, 193, 0.2)',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '0',
+                        left: '0',
+                        width: '100%',
+                        height: '3px',
+                        backgroundColor: '#8b5cf6',
+                        backgroundImage: 'linear-gradient(90deg, #8b5cf6, #a78bfa)'
+                      }}></div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{
+                          backgroundColor: '#8b5cf6',
+                          color: 'white',
+                          borderRadius: '8px',
+                          padding: '6px',
+                          marginRight: '8px'
+                        }}>
+                          📈
+                        </div>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          fontWeight: '600', 
+                          color: '#581c87',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          Savings Rate
+                        </span>
+                      </div>
+                      <div style={{ 
+                        fontSize: '24px', 
+                        fontWeight: '800', 
+                        color: '#581c87',
+                        marginBottom: '4px'
+                      }}>
+                        {filteredTotalCredit > 0 ? ((filteredBalance / filteredTotalCredit) * 100).toFixed(1) : '0.0'}%
+                      </div>
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: '#6b21a8',
+                        fontWeight: '500'
+                      }}>
+                        {filteredBalance >= 0 ? 'saving money' : 'spending more than earning'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Insights */}
+                  {filteredTransactions.length > 0 && (
+                    <div style={{
+                      marginTop: '16px',
+                      padding: '12px 16px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.6)',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(59, 130, 246, 0.1)',
+                      fontSize: '12px',
+                      color: '#4b5563',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <span>📅 Showing results for your current filter selection</span>
+                        <span>•</span>
+                        <span>💡 Average transaction: {formatCurrency(filteredTransactions.length > 0 ? (filteredTotalCredit + filteredTotalDebit) / filteredTransactions.length : 0)}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSortBy('none');
+                          setDateRangeFrom('');
+                          setDateRangeTo('');
+                          setSpecificDate('');
+                          setAmountGreaterThan('');
+                          setAmountLessThan('');
+                          setFrequencyFilter('all');
+                          setDateFilterType('all');
+                          setFilter('all');
+                          setSearchTerm('');
+                        }}
+                        style={{
+                          padding: '4px 12px',
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          color: '#3b82f6',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                        }}
+                      >
+                        🔄 Reset Filters
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Transactions Table */}
               <div style={{
