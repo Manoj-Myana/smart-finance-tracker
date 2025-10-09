@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Calendar, 
-  DollarSign, 
+  IndianRupee, 
   FileText, 
   TrendingUp, 
   TrendingDown,
@@ -495,7 +495,7 @@ const Transactions: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 bg-blue-100 rounded-xl">
-                <DollarSign className="h-6 w-6 text-blue-600" />
+                <IndianRupee className="h-6 w-6 text-blue-600" />
               </div>
               <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
                 balance >= 0 
@@ -570,7 +570,7 @@ const Transactions: React.FC = () => {
                 {/* Amount */}
                 <div>
                   <label className="block text-lg font-medium text-gray-700 mb-3">
-                    <DollarSign className="h-6 w-6 inline mr-3" />
+                    <IndianRupee className="h-6 w-6 inline mr-3" />
                     Amount
                   </label>
                   <input
@@ -988,7 +988,7 @@ const Transactions: React.FC = () => {
                           <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Amount Range</label>
                           <div className="space-y-2">
                             <div className="relative">
-                              <DollarSign 
+                              <IndianRupee 
                                 className="h-4 w-4 absolute text-gray-400 pointer-events-none" 
                                 style={{ 
                                   left: '12px', 
@@ -1013,7 +1013,7 @@ const Transactions: React.FC = () => {
                               />
                             </div>
                             <div className="relative">
-                              <DollarSign 
+                              <IndianRupee 
                                 className="h-4 w-4 absolute text-gray-400 pointer-events-none" 
                                 style={{ 
                                   left: '12px', 
@@ -1310,7 +1310,7 @@ const Transactions: React.FC = () => {
                           padding: '6px',
                           marginRight: '8px'
                         }}>
-                          <DollarSign style={{ width: '16px', height: '16px' }} />
+                          <IndianRupee style={{ width: '16px', height: '16px' }} />
                         </div>
                         <span style={{ 
                           fontSize: '14px', 
