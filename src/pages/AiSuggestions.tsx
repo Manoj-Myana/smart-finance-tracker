@@ -331,14 +331,14 @@ const AiSuggestions: React.FC = () => {
     const plans = [];
     const monthlyIncome = transactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0) / 12;
     
-    plans.push(`Emergency Fund: Save $${Math.round(monthlyIncome * 3)} over the next 12 months`);
-    plans.push(`Vacation Fund: Set aside $200-300 monthly for your next getaway`);
+    plans.push(`Emergency Fund: Save ₹${Math.round(monthlyIncome * 3).toLocaleString()} over the next 12 months`);
+    plans.push(`Vacation Fund: Set aside ₹5,000-8,000 monthly for your next getaway`);
     
     if (health.score > 60) {
-      plans.push(`Investment Goal: Start investing $${Math.round(monthlyIncome * 0.1)} monthly`);
+      plans.push(`Investment Goal: Start investing ₹${Math.round(monthlyIncome * 0.1).toLocaleString()} monthly`);
     }
     
-    plans.push(`Debt Reduction: Allocate extra $100-200 monthly toward high-interest debts`);
+    plans.push(`Debt Reduction: Allocate extra ₹2,500-5,000 monthly toward high-interest debts`);
     
     return plans;
   };
@@ -792,7 +792,7 @@ const AiSuggestions: React.FC = () => {
                     marginBottom: '12px',
                     margin: '0 0 12px 0'
                   }}>
-                    ${insight.amount.toLocaleString()}
+                    ₹{insight.amount.toLocaleString()}
                   </p>
                   <p style={{
                     fontSize: '14px',

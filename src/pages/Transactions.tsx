@@ -451,7 +451,7 @@ const Transactions: React.FC = () => {
               </span>
             </div>
             <p className="text-gray-700 text-sm font-medium mb-1">Total Credit</p>
-            <p className="text-3xl font-bold text-gray-900">${totalCredit.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-gray-900">{formatCurrency(totalCredit)}</p>
           </div>
 
           {/* Total Debit */}
@@ -471,7 +471,7 @@ const Transactions: React.FC = () => {
               </span>
             </div>
             <p className="text-gray-700 text-sm font-medium mb-1">Total Debit</p>
-            <p className="text-3xl font-bold text-gray-900">${totalDebit.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-gray-900">{formatCurrency(totalDebit)}</p>
           </div>
 
           {/* Balance */}
@@ -498,7 +498,7 @@ const Transactions: React.FC = () => {
             <p className={`text-3xl font-bold ${
               balance >= 0 ? 'text-green-600' : 'text-red-600'
             }`}>
-              ${Math.abs(balance).toFixed(2)}
+              {formatCurrency(Math.abs(balance))}
             </p>
           </div>
         </div>

@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className="text-gray-700 text-sm font-medium mb-1">Total Balance</p>
-            <p className="text-3xl font-bold text-gray-900">$24,500.00</p>
+            <p className="text-3xl font-bold text-gray-900">₹24,50,000</p>
             <p className="text-xs text-gray-600 mt-1">All accounts combined</p>
           </div>
 
@@ -141,7 +141,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className="text-gray-700 text-sm font-medium mb-1">Monthly Income</p>
-            <p className="text-3xl font-bold text-gray-900">$8,200.00</p>
+            <p className="text-3xl font-bold text-gray-900">₹8,20,000</p>
             <p className="text-xs text-gray-600 mt-1">From 3 sources</p>
           </div>
 
@@ -163,7 +163,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className="text-gray-700 text-sm font-medium mb-1">Monthly Expenses</p>
-            <p className="text-3xl font-bold text-gray-900">$3,750.00</p>
+            <p className="text-3xl font-bold text-gray-900">₹3,75,000</p>
             <p className="text-xs text-gray-600 mt-1">Across 12 categories</p>
           </div>
 
@@ -184,12 +184,12 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className="text-gray-700 text-sm font-medium mb-1">Savings Goal</p>
-            <p className="text-3xl font-bold text-gray-900">$7,300</p>
+            <p className="text-3xl font-bold text-gray-900">₹7,30,000</p>
             <div className="mt-3">
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div className="bg-purple-600 h-2 rounded-full w-3/4 transition-all"></div>
               </div>
-              <p className="text-xs text-gray-600 mt-2">$2,700 to go</p>
+              <p className="text-xs text-gray-600 mt-2">₹2,70,000 to go</p>
             </div>
           </div>
         </div>
@@ -276,7 +276,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-sm text-gray-500">Today, 2:30 PM</p>
                     </div>
                   </div>
-                  <p className="font-bold text-green-600">+$4,200.00</p>
+                  <p className="font-bold text-green-600">+₹4,20,000</p>
                 </div>
                 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
@@ -289,7 +289,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-sm text-gray-500">Yesterday, 6:45 PM</p>
                     </div>
                   </div>
-                  <p className="font-bold text-red-600">-$145.99</p>
+                  <p className="font-bold text-red-600">-₹14,599</p>
                 </div>
                 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
@@ -302,7 +302,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-sm text-gray-500">2 days ago, 10:15 AM</p>
                     </div>
                   </div>
-                  <p className="font-bold text-red-600">-$87.32</p>
+                  <p className="font-bold text-red-600">-₹8,732</p>
                 </div>
               </div>
             </div>
@@ -333,7 +333,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-xs text-gray-500">**** 4532</p>
                     </div>
                   </div>
-                  <p className="font-bold text-gray-900">$18,500</p>
+                  <p className="font-bold text-gray-900">₹18,50,000</p>
                 </div>
                 
                 <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
@@ -346,7 +346,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-xs text-gray-500">**** 7891</p>
                     </div>
                   </div>
-                  <p className="font-bold text-gray-900">$6,000</p>
+                  <p className="font-bold text-gray-900">₹6,00,000</p>
                 </div>
               </div>
             </div>
@@ -405,7 +405,7 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm font-semibold text-gray-900">Rent Payment</p>
                     <p className="text-xs text-gray-500">Due in 3 days</p>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">$1,200</p>
+                  <p className="text-sm font-bold text-gray-900">₹1,20,000</p>
                 </div>
                 
                 <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
@@ -414,7 +414,7 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm font-semibold text-gray-900">Credit Card</p>
                     <p className="text-xs text-gray-500">Due in 8 days</p>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">$450</p>
+                  <p className="text-sm font-bold text-gray-900">₹45,000</p>
                 </div>
               </div>
             </div>

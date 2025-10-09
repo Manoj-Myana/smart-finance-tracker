@@ -163,7 +163,7 @@ const Home: React.FC = () => {
               <div className="bg-white p-6 rounded-2xl shadow-lg mb-6">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-gray-600 font-medium">Predicted savings in 6 months</span>
-                  <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600">$12,450</span>
+                  <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600">₹12,45,000</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                   <div className="bg-gradient-to-r from-orange-500 to-yellow-500 h-3 rounded-full shadow-sm" style={{width: '75%'}}></div>
@@ -232,7 +232,7 @@ const Home: React.FC = () => {
                   <div>
                     <h4 className="font-semibold text-gray-900 mb-2">Today's AI Suggestion:</h4>
                     <p className="text-gray-700">
-                      "Based on your spending pattern, you could save <span className="font-bold text-green-600">$340</span> this month by reducing 
+                      "Based on your spending pattern, you could save <span className="font-bold text-green-600">₹8,500</span> this month by reducing 
                       dining out expenses by 30% and switching to our recommended phone plan."
                     </p>
                   </div>
