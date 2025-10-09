@@ -194,6 +194,18 @@ const Reports: React.FC = () => {
         setExtractedTransactions(result.transactions);
         setShowExtractedTransactions(true);
         alert(`Successfully extracted ${result.count} transactions using Flask backend with pdfplumber!`);
+        
+        // Scroll to extracted transactions section after a short delay
+        setTimeout(() => {
+          const element = document.getElementById('extracted-transactions-section');
+          if (element) {
+            element.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start',
+              inline: 'nearest'
+            });
+          }
+        }, 500);
       } else {
         throw new Error('Invalid response from Flask backend');
       }
@@ -495,6 +507,18 @@ const Reports: React.FC = () => {
         setExtractedTransactions(result.transactions);
         setShowExtractedTransactions(true);
         alert(`Successfully extracted ${result.count} transactions from Excel file!`);
+        
+        // Scroll to extracted transactions section after a short delay
+        setTimeout(() => {
+          const element = document.getElementById('extracted-transactions-section');
+          if (element) {
+            element.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start',
+              inline: 'nearest'
+            });
+          }
+        }, 500);
       } else {
         throw new Error('Invalid response from Flask backend');
       }
@@ -1153,6 +1177,7 @@ const Reports: React.FC = () => {
         {/* Extracted Transactions Table */}
         {showExtractedTransactions && extractedTransactions.length > 0 && (
           <div 
+            id="extracted-transactions-section"
             style={{
               marginTop: '32px',
               padding: '24px',
