@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Wallet, LogOut } from 'lucide-react';
+import { Wallet, LogOut, CreditCard } from 'lucide-react';
 
 interface NavbarProps {
   isHomePage?: boolean;
@@ -114,6 +114,7 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
     { path: '/reports', label: 'PDF/Excel' },
     { path: '/predict', label: 'Predict Future Values' },
     { path: '/analytics', label: 'Analytics' },
+    { path: '/loans', label: 'Loans' },
     { path: '/goals', label: 'Goals' },
     { path: '/ai-suggestions', label: 'AI Suggestions' },
   ];

@@ -7,6 +7,17 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
+// Add error handlers for unhandled rejections and exceptions
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process - just log the error
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Log but don't exit immediately
+});
+
 const app = express();
 const PORT = process.env.BACKEND_PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
@@ -62,6 +73,24 @@ db.serialize(() => {
     target_date TEXT NOT NULL,
     description TEXT NOT NULL,
     amount REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS loans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    loan_amount REAL NOT NULL,
+    interest_rate REAL NOT NULL,
+    tenure INTEGER NOT NULL,
+    loan_type TEXT NOT NULL,
+    interest_type TEXT NOT NULL CHECK (interest_type IN ('simple', 'compound')),
+    monthly_emi REAL NOT NULL,
+    total_amount REAL NOT NULL,
+    total_interest REAL NOT NULL,
+    expected_clearance_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'defaulted')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -1229,6 +1258,253 @@ app.get('/api/debug/users', (req, res) => {
       return res.status(500).json({ success: false, message: 'Database error' });
     }
     res.json({ success: true, users: rows });
+  });
+});
+
+// ==================== LOAN ENDPOINTS ====================
+
+// Get all loans for a user
+app.get('/api/loans/:userId', authenticateToken, (req, res) => {
+  const userId = parseInt(req.params.userId);
+  
+  // Ensure user can only access their own loans  
+  if (parseInt(req.user.userId) !== userId) {
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Access denied' 
+    });
+  }
+
+  const query = `
+    SELECT * FROM loans 
+    WHERE user_id = ? 
+    ORDER BY created_at DESC
+  `;
+
+  db.all(query, [userId], (err, loans) => {
+    if (err) {
+      console.error('Error fetching loans:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to fetch loans' 
+      });
+    }
+
+    res.json(loans || []);
+  });
+});
+
+// Create a new loan
+app.post('/api/loans', authenticateToken, (req, res) => {
+  const {
+    user_id,
+    loan_amount,
+    interest_rate,
+    tenure,
+    loan_type,
+    interest_type,
+    monthly_emi,
+    total_amount,
+    total_interest,
+    expected_clearance_date,
+    status = 'active'
+  } = req.body;
+
+  // Validate required fields
+  if (!user_id || !loan_amount || !interest_rate || !tenure || !loan_type || 
+      !interest_type || !monthly_emi || !total_amount || !total_interest || 
+      !expected_clearance_date) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'All loan fields are required' 
+    });
+  }
+
+  // Ensure user can only create loans for themselves
+  if (parseInt(req.user.userId) !== parseInt(user_id)) {
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Access denied' 
+    });
+  }
+
+  const query = `
+    INSERT INTO loans (
+      user_id, loan_amount, interest_rate, tenure, loan_type, 
+      interest_type, monthly_emi, total_amount, total_interest, 
+      expected_clearance_date, status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `;
+
+  const values = [
+    user_id, loan_amount, interest_rate, tenure, loan_type,
+    interest_type, monthly_emi, total_amount, total_interest,
+    expected_clearance_date, status
+  ];
+
+  db.run(query, values, function(err) {
+    if (err) {
+      console.error('Error creating loan:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to create loan' 
+      });
+    }
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Loan created successfully',
+      loanId: this.lastID 
+    });
+  });
+});
+
+// Update loan status
+app.put('/api/loans/:loanId', authenticateToken, (req, res) => {
+  const loanId = parseInt(req.params.loanId);
+  const { status } = req.body;
+
+  if (!status || !['active', 'completed', 'defaulted'].includes(status)) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Valid status is required' 
+    });
+  }
+
+  // First, check if the loan belongs to the user
+  const checkQuery = 'SELECT user_id FROM loans WHERE id = ?';
+  
+  db.get(checkQuery, [loanId], (err, loan) => {
+    if (err) {
+      console.error('Error checking loan ownership:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Database error' 
+      });
+    }
+
+    if (!loan) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Loan not found' 
+      });
+    }
+
+    if (loan.user_id !== parseInt(req.user.userId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied' 
+      });
+    }
+
+    // Update the loan status
+    const updateQuery = 'UPDATE loans SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+    
+    db.run(updateQuery, [status, loanId], function(err) {
+      if (err) {
+        console.error('Error updating loan:', err);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Failed to update loan' 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Loan updated successfully' 
+      });
+    });
+  });
+});
+
+// Delete a loan
+app.delete('/api/loans/:loanId', authenticateToken, (req, res) => {
+  const loanId = parseInt(req.params.loanId);
+
+  // First, check if the loan belongs to the user
+  const checkQuery = 'SELECT user_id FROM loans WHERE id = ?';
+  
+  db.get(checkQuery, [loanId], (err, loan) => {
+    if (err) {
+      console.error('Error checking loan ownership:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Database error' 
+      });
+    }
+
+    if (!loan) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Loan not found' 
+      });
+    }
+
+    if (loan.user_id !== parseInt(req.user.userId)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied' 
+      });
+    }
+
+    // Delete the loan
+    const deleteQuery = 'DELETE FROM loans WHERE id = ?';
+    
+    db.run(deleteQuery, [loanId], function(err) {
+      if (err) {
+        console.error('Error deleting loan:', err);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Failed to delete loan' 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Loan deleted successfully' 
+      });
+    });
+  });
+});
+
+// Get loan statistics for a user
+app.get('/api/loans/:userId/stats', authenticateToken, (req, res) => {
+  const userId = parseInt(req.params.userId);
+  
+  if (parseInt(req.user.userId) !== userId) {
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Access denied' 
+    });
+  }
+
+  const query = `
+    SELECT 
+      COUNT(*) as total_loans,
+      COUNT(CASE WHEN status = 'active' THEN 1 END) as active_loans,
+      COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_loans,
+      SUM(CASE WHEN status = 'active' THEN loan_amount ELSE 0 END) as total_active_amount,
+      SUM(CASE WHEN status = 'active' THEN monthly_emi ELSE 0 END) as total_monthly_emi
+    FROM loans 
+    WHERE user_id = ?
+  `;
+
+  db.get(query, [userId], (err, stats) => {
+    if (err) {
+      console.error('Error fetching loan stats:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to fetch loan statistics' 
+      });
+    }
+
+    res.json(stats || {
+      total_loans: 0,
+      active_loans: 0,
+      completed_loans: 0,
+      total_active_amount: 0,
+      total_monthly_emi: 0
+    });
   });
 });
 

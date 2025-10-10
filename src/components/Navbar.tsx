@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, PlusCircle, BarChart3, Target, Settings, Wallet } from 'lucide-react';
+import { Home, PlusCircle, BarChart3, Target, Settings, Wallet, CreditCard } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const location = useLocation();
@@ -9,6 +9,7 @@ const Navbar: React.FC = () => {
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/transactions', icon: PlusCircle, label: 'Transactions' },
     { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/loans', icon: CreditCard, label: 'Loans' },
     { path: '/budgets', icon: Wallet, label: 'Budgets' },
     { path: '/goals', icon: Target, label: 'Goals' },
     { path: '/settings', icon: Settings, label: 'Settings' },

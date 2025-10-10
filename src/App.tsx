@@ -10,6 +10,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Analytics from "./pages/Analytics";
+import Loans from "./pages/Loans";
 import Reports from "./pages/Reports";
 import Predict from "./pages/Predict";
 import Goals from "./pages/Goals";
@@ -30,6 +31,7 @@ function AppContent() {
         <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
         <Route path="/transactions" element={<Layout><Transactions /></Layout>} />
         <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
+        <Route path="/loans" element={<Layout><Loans /></Layout>} />
         <Route path="/reports" element={<Layout><Reports /></Layout>} />
         <Route path="/predict" element={<Layout><Predict /></Layout>} />
         <Route path="/goals" element={<Layout><Goals /></Layout>} />
