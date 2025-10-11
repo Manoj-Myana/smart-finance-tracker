@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Calculator, Calendar, TrendingUp, PiggyBank, AlertCircle, CheckCircle, Loader, Save, Eye, Trash2 } from 'lucide-react';
+import Toast from '../components/Toast';
 
 interface UserType {
   id: number;
@@ -76,7 +77,17 @@ const Loans: React.FC = () => {
   const [takenLoans, setTakenLoans] = useState<LoanData[]>([]);
   const [isConfirming, setIsConfirming] = useState(false);
   
+  // Toast notification states
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [showToast, setShowToast] = useState<boolean>(false);
+  
   const navigate = useNavigate();
+
+  // Helper function to show toast notification
+  const showToastNotification = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+  };
 
   const loanTypes = [
     { value: 'personal', label: 'Personal Loan', description: 'For personal expenses and emergencies' },
@@ -284,7 +295,7 @@ const Loans: React.FC = () => {
       console.log('Response headers:', response.headers);
 
       if (response.ok) {
-        alert('Loan confirmed successfully! 🎉');
+        showToastNotification('Loan confirmed successfully! 🎉');
         await fetchTakenLoans();
         setActiveTab('myLoans');
         
@@ -327,7 +338,7 @@ const Loans: React.FC = () => {
       });
 
       if (response.ok) {
-        alert('Loan deleted successfully!');
+        showToastNotification('Loan deleted successfully!');
         await fetchTakenLoans();
       } else {
         alert('Failed to delete loan');
@@ -1307,6 +1318,13 @@ const Loans: React.FC = () => {
             )}
           </div>
         )}
+        
+        {/* Toast Notification */}
+        <Toast 
+          message={toastMessage}
+          isVisible={showToast}
+          onClose={() => setShowToast(false)}
+        />
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import {
   ArrowDownRight,
   Edit
 } from 'lucide-react';
+import Toast from '../components/Toast';
 
 interface Transaction {
   id: number;
@@ -51,6 +52,10 @@ const Transactions: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   
+  // Toast notification states
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [showToast, setShowToast] = useState<boolean>(false);
+  
   // New filter states
   const [sortBy, setSortBy] = useState<'none' | 'newest' | 'oldest'>('none');
   const [dateRangeFrom, setDateRangeFrom] = useState('');
@@ -65,6 +70,12 @@ const Transactions: React.FC = () => {
   const transactionTableRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate();
+
+  // Helper function to show toast notification
+  const showToastNotification = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+  };
 
   useEffect(() => {
     // Get user data from localStorage
@@ -314,7 +325,7 @@ const Transactions: React.FC = () => {
         if (user) {
           fetchTransactions(user.id);
         }
-        alert(`Successfully deleted ${selectedTransactions.size} transaction(s)`);
+        showToastNotification(`Successfully deleted ${selectedTransactions.size} transaction(s)`);
       } else {
         alert(`Failed to delete ${failedDeletes.length} transaction(s). Please try again.`);
       }
@@ -2048,6 +2059,13 @@ const Transactions: React.FC = () => {
           </div>
         </div>
       </main>
+      
+      {/* Toast Notification */}
+      <Toast 
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 };

@@ -16,6 +16,7 @@ import {
   XCircle
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
+import Toast from '../components/Toast';
 
 // Set up PDF.js worker with local worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = process.env.NODE_ENV === 'development' 
@@ -64,7 +65,18 @@ const Reports: React.FC = () => {
   const [merging, setMerging] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<ExtractedTransaction>>({});
+  
+  // Toast notification states
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [showToast, setShowToast] = useState<boolean>(false);
+  
   const navigate = useNavigate();
+  
+  // Helper function to show toast notification
+  const showToastNotification = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+  };
   
   // Function to fetch existing transactions from the database
   const fetchExistingTransactions = async () => {
@@ -193,7 +205,7 @@ const Reports: React.FC = () => {
         console.log('Extracted transactions from Flask:', result.transactions);
         setExtractedTransactions(result.transactions);
         setShowExtractedTransactions(true);
-        alert(`Successfully extracted ${result.count} transactions using Flask backend with pdfplumber!`);
+        showToastNotification(`Successfully extracted ${result.count} transactions!`);
         
         // Scroll to extracted transactions section after a short delay
         setTimeout(() => {
@@ -506,7 +518,7 @@ const Reports: React.FC = () => {
         console.log('Extracted transactions from Flask:', result.transactions);
         setExtractedTransactions(result.transactions);
         setShowExtractedTransactions(true);
-        alert(`Successfully extracted ${result.count} transactions from Excel file!`);
+        showToastNotification(`Successfully extracted ${result.count} transactions!`);
         
         // Scroll to extracted transactions section after a short delay
         setTimeout(() => {
@@ -570,7 +582,7 @@ const Reports: React.FC = () => {
       console.log('Merge result:', result);
       
       // Success feedback
-      alert(`Successfully merged ${result.saved_count} transactions to your account!`);
+      showToastNotification(`Successfully merged ${result.saved_count} transactions to your account!`);
       
       // Clear the extracted transactions
       setExtractedTransactions([]);
@@ -1802,6 +1814,13 @@ const Reports: React.FC = () => {
           </div>
         )}
       </main>
+      
+      {/* Toast Notification */}
+      <Toast 
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
     </>
   );
