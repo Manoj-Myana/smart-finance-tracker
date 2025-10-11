@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -60,6 +60,9 @@ const Transactions: React.FC = () => {
   const [amountLessThan, setAmountLessThan] = useState('');
   const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'regular' | 'irregular'>('all');
   const [dateFilterType, setDateFilterType] = useState<'all' | 'range' | 'specific'>('all');
+  
+  // Ref for auto-scroll to transaction table
+  const transactionTableRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate();
 
@@ -214,6 +217,16 @@ const Transactions: React.FC = () => {
         setEditingTransaction(null);
         // Refresh transactions
         fetchTransactions(user.id);
+        
+        // Auto-scroll to transaction table after adding a new transaction
+        if (!editingTransaction && transactionTableRef.current) {
+          setTimeout(() => {
+            transactionTableRef.current?.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start' 
+            });
+          }, 100); // Small delay to ensure DOM updates
+        }
       } else {
         console.error(`Failed to ${editingTransaction ? 'update' : 'add'} transaction:`, responseData);
         alert(`Failed to ${editingTransaction ? 'update' : 'add'} transaction: ${responseData.message || 'Please try again.'}`);
@@ -1478,7 +1491,9 @@ const Transactions: React.FC = () => {
               )}
 
               {/* Transactions Table */}
-              <div style={{
+              <div 
+                ref={transactionTableRef}
+                style={{
                 backgroundColor: 'white',
                 borderRadius: '16px',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',

@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// Add CSS animations
+const styles = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`;
+
 interface Goal {
   id: number;
   user_id: number;
@@ -10,6 +29,30 @@ interface Goal {
   created_at: string;
 }
 
+interface LoanData {
+  id: number;
+  user_id: number;
+  loan_amount: number;
+  interest_rate: number;
+  tenure: number;
+  loan_type: string;
+  interest_type: 'simple' | 'compound';
+  monthly_emi: number;
+  total_amount: number;
+  total_interest: number;
+  expected_clearance_date: string;
+  status: 'active' | 'completed' | 'defaulted';
+  created_at: string;
+}
+
+interface PredictionData {
+  month: string;
+  year?: number;
+  income_expected: number;
+  expense_expected: number;
+  savings_expected: number;
+}
+
 const Goals: React.FC = () => {
   const navigate = useNavigate();
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -17,14 +60,222 @@ const Goals: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [formData, setFormData] = useState({
-    date: '',
     description: '',
     amount: ''
   });
+  const [calculatedTargetDate, setCalculatedTargetDate] = useState<string>('');
+  const [calculating, setCalculating] = useState(false);
+  const [loans, setLoans] = useState<LoanData[]>([]);
+  const [predictions, setPredictions] = useState<PredictionData[]>([]);
+
+  // Inject CSS styles
+  useEffect(() => {
+    const styleSheet = document.createElement("style");
+    styleSheet.type = "text/css";
+    styleSheet.innerText = styles;
+    document.head.appendChild(styleSheet);
+    
+    return () => {
+      document.head.removeChild(styleSheet);
+    };
+  }, []);
 
   useEffect(() => {
     fetchGoals();
+    fetchLoans();
   }, []);
+
+  useEffect(() => {
+    if (formData.amount && parseFloat(formData.amount) > 0 && !editingGoal) {
+      calculateTargetDate();
+    }
+  }, [formData.amount, loans, editingGoal]);
+
+  const fetchLoans = async () => {
+    try {
+      const userData = localStorage.getItem('userData');
+      const token = localStorage.getItem('authToken');
+
+      if (!userData || !token) {
+        return;
+      }
+
+      const user = JSON.parse(userData);
+      const response = await fetch(`http://localhost:5000/api/loans/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const loansData = await response.json();
+        setLoans(Array.isArray(loansData) ? loansData : []);
+      }
+    } catch (error) {
+      console.error('Error fetching loans:', error);
+      setLoans([]);
+    }
+  };
+
+  const fetchPredictions = async (): Promise<PredictionData[]> => {
+    try {
+      const userData = localStorage.getItem('userData');
+      const token = localStorage.getItem('authToken');
+
+      if (!userData || !token) {
+        return [];
+      }
+
+      const user = JSON.parse(userData);
+      
+      // First get transactions
+      const transactionResponse = await fetch(`http://localhost:5000/api/transactions/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!transactionResponse.ok) {
+        return [];
+      }
+
+      const transactions = await transactionResponse.json();
+      
+      if (!Array.isArray(transactions) || transactions.length === 0) {
+        return [];
+      }
+
+      // Get AI predictions
+      const predictionResponse = await fetch(`http://127.0.0.1:5001/api/predict-future`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactions: transactions,
+          months_ahead: 60
+        }),
+      });
+
+      const result = await predictionResponse.json();
+      
+      if (result.success && result.predictions) {
+        return result.predictions;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching predictions:', error);
+      return [];
+    }
+  };
+
+  const getLatestLoanClearanceDate = (): Date => {
+    if (loans.length === 0) {
+      return new Date();
+    }
+
+    const activeLoans = loans.filter(loan => loan.status === 'active');
+    
+    if (activeLoans.length === 0) {
+      return new Date();
+    }
+
+    const latestClearanceDate = activeLoans.reduce((latest, loan) => {
+      const loanClearanceDate = new Date(loan.expected_clearance_date);
+      return loanClearanceDate > latest ? loanClearanceDate : latest;
+    }, new Date());
+
+    return latestClearanceDate;
+  };
+
+  const calculateTargetDate = async () => {
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      setCalculatedTargetDate('');
+      return;
+    }
+
+    setCalculating(true);
+    
+    try {
+      const goalAmount = parseFloat(formData.amount);
+      const latestClearanceDate = getLatestLoanClearanceDate();
+      
+      // Add one month buffer after loan clearance
+      const startSavingDate = new Date(latestClearanceDate);
+      startSavingDate.setMonth(startSavingDate.getMonth() + 1);
+      
+      // Get predictions
+      const predictionsData = await fetchPredictions();
+      
+      if (predictionsData.length === 0) {
+        // Fallback calculation with basic assumptions
+        const basicMonthlySavings = 10000; // Assume ₹10,000 monthly savings
+        const monthsNeeded = Math.ceil(goalAmount / basicMonthlySavings);
+        const targetDate = new Date(startSavingDate);
+        targetDate.setMonth(targetDate.getMonth() + monthsNeeded);
+        
+        setCalculatedTargetDate(targetDate.toISOString().split('T')[0]);
+        setPredictions([]);
+      } else {
+        // Calculate based on AI predictions
+        setPredictions(predictionsData);
+        
+        const currentDate = new Date();
+        const monthsUntilSavingStarts = Math.max(0, Math.floor((startSavingDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
+        
+        let cumulativeSavings = 0;
+        let monthsRequired = 0;
+        let foundTargetMonth = false;
+        
+        const startIndex = Math.min(monthsUntilSavingStarts, predictionsData.length - 1);
+        
+        for (let i = startIndex; i < predictionsData.length; i++) {
+          const prediction = predictionsData[i];
+          cumulativeSavings += prediction.savings_expected;
+          monthsRequired = i + 1 - startIndex;
+
+          if (cumulativeSavings >= goalAmount) {
+            foundTargetMonth = true;
+            const targetYear = prediction.year || new Date().getFullYear();
+            const targetDate = new Date(targetYear, getMonthIndex(prediction.month), 1);
+            setCalculatedTargetDate(targetDate.toISOString().split('T')[0]);
+            break;
+          }
+        }
+
+        if (!foundTargetMonth) {
+          // If we can't achieve the goal within prediction range, estimate
+          const averageMonthlySavings = predictionsData.slice(0, 6).reduce((sum, p) => sum + p.savings_expected, 0) / 6;
+          const estimatedMonthsNeeded = Math.ceil(goalAmount / averageMonthlySavings);
+          const targetDate = new Date(startSavingDate);
+          targetDate.setMonth(targetDate.getMonth() + estimatedMonthsNeeded);
+          
+          setCalculatedTargetDate(targetDate.toISOString().split('T')[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating target date:', error);
+      // Fallback calculation
+      const basicMonthlySavings = 10000;
+      const goalAmount = parseFloat(formData.amount);
+      const monthsNeeded = Math.ceil(goalAmount / basicMonthlySavings);
+      const latestClearanceDate = getLatestLoanClearanceDate();
+      const targetDate = new Date(latestClearanceDate);
+      targetDate.setMonth(targetDate.getMonth() + monthsNeeded + 1);
+      
+      setCalculatedTargetDate(targetDate.toISOString().split('T')[0]);
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  const getMonthIndex = (monthName: string): number => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    return months.findIndex(month => month.toLowerCase() === monthName.toLowerCase());
+  };
 
   const fetchGoals = async () => {
     try {
@@ -72,6 +323,11 @@ const Goals: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!calculatedTargetDate) {
+      alert('Please wait for the target date calculation to complete.');
+      return;
+    }
+    
     try {
       const userData = localStorage.getItem('userData');
       const token = localStorage.getItem('authToken');
@@ -85,7 +341,7 @@ const Goals: React.FC = () => {
       const user = JSON.parse(userData);
       const goalData = {
         user_id: user.id,
-        target_date: formData.date,
+        target_date: editingGoal ? editingGoal.target_date : calculatedTargetDate,
         description: formData.description,
         amount: parseFloat(formData.amount)
       };
@@ -102,7 +358,10 @@ const Goals: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(goalData),
+        body: JSON.stringify({
+          ...goalData,
+          target_date: editingGoal ? editingGoal.target_date : calculatedTargetDate
+        }),
       });
 
       if (response.ok) {
@@ -110,7 +369,8 @@ const Goals: React.FC = () => {
         console.log('Goal saved successfully:', result);
         
         // Reset form
-        setFormData({ date: '', description: '', amount: '' });
+        setFormData({ description: '', amount: '' });
+        setCalculatedTargetDate('');
         setShowForm(false);
         setEditingGoal(null);
         
@@ -133,10 +393,10 @@ const Goals: React.FC = () => {
   const handleEdit = (goal: Goal) => {
     setEditingGoal(goal);
     setFormData({
-      date: goal.target_date,
       description: goal.description,
       amount: goal.amount.toString()
     });
+    setCalculatedTargetDate(goal.target_date);
     setShowForm(true);
   };
 
@@ -166,7 +426,8 @@ const Goals: React.FC = () => {
   };
 
   const handleCancel = () => {
-    setFormData({ date: '', description: '', amount: '' });
+    setFormData({ description: '', amount: '' });
+    setCalculatedTargetDate('');
     setShowForm(false);
     setEditingGoal(null);
   };
@@ -349,43 +610,67 @@ const Goals: React.FC = () => {
               gap: '24px',
               marginBottom: '32px'
             }}>
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '8px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  📅 Target Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  style={{
+              {!editingGoal && (
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    📅 Calculated Target Date
+                  </label>
+                  <div style={{
                     width: '100%',
                     padding: '16px',
-                    border: '2px solid #e5e7eb',
+                    border: calculatedTargetDate ? '2px solid #10b981' : '2px solid #e5e7eb',
                     borderRadius: '12px',
                     fontSize: '16px',
-                    background: 'white',
-                    transition: 'all 0.3s ease',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#667eea';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                  required
-                />
-              </div>
+                    background: calculatedTargetDate ? '#f0fdf4' : '#f9fafb',
+                    color: calculatedTargetDate ? '#059669' : '#6b7280',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {calculating ? (
+                      <>
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          border: '2px solid #e5e7eb',
+                          borderTop: '2px solid #667eea',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Calculating...
+                      </>
+                    ) : calculatedTargetDate ? (
+                      <>
+                        🎯 {formatDate(calculatedTargetDate)}
+                      </>
+                    ) : (
+                      'Enter goal amount to calculate target date'
+                    )}
+                  </div>
+                  {calculatedTargetDate && loans.length > 0 && (
+                    <div style={{
+                      marginTop: '8px',
+                      padding: '8px 12px',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      color: '#1e40af',
+                      border: '1px solid rgba(59, 130, 246, 0.2)'
+                    }}>
+                      ℹ️ Target date calculated after clearing all active loans ({loans.filter(l => l.status === 'active').length} active)
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div>
                 <label style={{
