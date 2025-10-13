@@ -18,8 +18,10 @@ import {
   Activity,
   BarChart3,
   Award,
-  RefreshCw
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
+import geminiService from '../services/geminiService';
 
 interface Transaction {
   id: number;
@@ -54,6 +56,14 @@ interface FinancialHealthMetrics {
   debtRatio: number;
 }
 
+interface GeminiSuggestion {
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestion: string;
+  potentialSavings?: string;
+  actionItems: string[];
+}
+
 const AiSuggestions: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<UserType | null>(null);
@@ -66,6 +76,10 @@ const AiSuggestions: React.FC = () => {
   const [investmentSuggestions, setInvestmentSuggestions] = useState<string[]>([]);
   const [goalPlans, setGoalPlans] = useState<string[]>([]);
   const [expenseOptimizations, setExpenseOptimizations] = useState<string[]>([]);
+  
+  // Add Gemini AI suggestions state
+  const [geminiSuggestions, setGeminiSuggestions] = useState<GeminiSuggestion[]>([]);
+  const [geminiLoading, setGeminiLoading] = useState(false);
 
   useEffect(() => {
     // Get user data from localStorage (matching Transactions page pattern)
@@ -148,11 +162,60 @@ const AiSuggestions: React.FC = () => {
       const optimizations = generateExpenseOptimizations(transactions, insights);
       setExpenseOptimizations(optimizations);
 
+      // Generate Gemini AI suggestions
+      await generateGeminiSuggestions(transactions);
+
       console.log('AI analysis completed with insights:', insights.length);
     } catch (error) {
       console.error('Error analyzing financial data:', error);
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const generateGeminiSuggestions = async (transactions: Transaction[]) => {
+    setGeminiLoading(true);
+    try {
+      const userProfile = {
+        name: user?.fullName || 'User',
+        monthlyIncome: calculateMonthlyIncome(transactions)
+      };
+
+      const suggestions = await geminiService.generatePersonalizedSuggestions(
+        transactions, 
+        userProfile
+      );
+      
+      setGeminiSuggestions(suggestions);
+      console.log('Generated Gemini AI suggestions:', suggestions);
+    } catch (error) {
+      console.error('Error generating Gemini suggestions:', error);
+      setGeminiSuggestions([]);
+    } finally {
+      setGeminiLoading(false);
+    }
+  };
+
+  const calculateMonthlyIncome = (transactions: Transaction[]): number => {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    const currentMonthIncome = transactions
+      .filter(t => {
+        const transactionDate = new Date(t.date);
+        return t.type === 'credit' && 
+               transactionDate.getMonth() === currentMonth && 
+               transactionDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, t) => sum + t.amount, 0);
+      
+    return currentMonthIncome;
+  };
+
+  const refreshGeminiSuggestions = async () => {
+    if (transactions.length > 0) {
+      await generateGeminiSuggestions(transactions);
     }
   };
 
@@ -454,6 +517,14 @@ const AiSuggestions: React.FC = () => {
             }
             100% {
               background-position: 200px 0;
+            }
+          }
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+            to {
+              transform: rotate(360deg);
             }
           }
         `}
@@ -805,6 +876,250 @@ const AiSuggestions: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Gemini AI Personalized Suggestions */}
+        {geminiSuggestions.length > 0 && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '28px',
+            padding: '32px',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.15)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            marginBottom: '40px',
+            animation: 'fadeInUp 0.6s ease-out 0.3s both',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Gemini AI Badge */}
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center'
+            }}>
+              <button
+                onClick={refreshGeminiSuggestions}
+                disabled={geminiLoading}
+                style={{
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderRadius: '8px',
+                  padding: '6px',
+                  cursor: geminiLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  if (!geminiLoading) {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                }}
+              >
+                <RefreshCw style={{ 
+                  height: '14px', 
+                  width: '14px', 
+                  color: '#8B5CF6',
+                  animation: geminiLoading ? 'spin 1s linear infinite' : 'none'
+                }} />
+              </button>
+              <div style={{
+                background: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%)',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+              }}>
+                <Sparkles style={{ height: '14px', width: '14px' }} />
+                Powered by Gemini AI
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '16px', 
+              marginBottom: '28px',
+              paddingRight: '180px'
+            }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%)',
+                borderRadius: '20px',
+                padding: '16px',
+                boxShadow: '0 8px 32px rgba(139, 92, 246, 0.3)'
+              }}>
+                <Brain style={{ height: '28px', width: '28px', color: 'white' }} />
+              </div>
+              <div>
+                <h3 style={{ 
+                  fontSize: '24px', 
+                  fontWeight: '700', 
+                  color: '#1a202c', 
+                  margin: '0 0 4px 0' 
+                }}>
+                  AI-Powered Insights
+                </h3>
+                <p style={{ 
+                  fontSize: '14px', 
+                  color: '#718096', 
+                  margin: 0 
+                }}>
+                  Personalized recommendations based on your last 3 months of spending
+                </p>
+              </div>
+            </div>
+
+            {geminiLoading ? (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                padding: '40px' 
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  color: '#8B5CF6'
+                }}>
+                  <RefreshCw style={{ 
+                    height: '24px', 
+                    width: '24px', 
+                    animation: 'spin 1s linear infinite' 
+                  }} />
+                  <span style={{ fontSize: '16px', fontWeight: '500' }}>
+                    Generating personalized insights...
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {geminiSuggestions.map((suggestion, index) => (
+                  <div key={index} style={{
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%)',
+                    border: '1px solid rgba(139, 92, 246, 0.1)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'flex-start',
+                      marginBottom: '12px' 
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          background: suggestion.priority === 'high' 
+                            ? 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
+                            : suggestion.priority === 'medium'
+                            ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                            : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                          color: 'white',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          textTransform: 'uppercase'
+                        }}>
+                          {suggestion.priority}
+                        </span>
+                        <h4 style={{ 
+                          fontSize: '18px', 
+                          fontWeight: '600', 
+                          color: '#1a202c',
+                          margin: 0
+                        }}>
+                          {suggestion.category}
+                        </h4>
+                      </div>
+                      {suggestion.potentialSavings && (
+                        <div style={{
+                          background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                          color: 'white',
+                          padding: '6px 12px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          Save {suggestion.potentialSavings}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <p style={{ 
+                      fontSize: '14px', 
+                      color: '#4a5568',
+                      lineHeight: '1.6',
+                      marginBottom: '16px'
+                    }}>
+                      {suggestion.suggestion}
+                    </p>
+                    
+                    {suggestion.actionItems.length > 0 && (
+                      <div>
+                        <h5 style={{ 
+                          fontSize: '14px', 
+                          fontWeight: '600', 
+                          color: '#2d3748',
+                          marginBottom: '8px'
+                        }}>
+                          Action Steps:
+                        </h5>
+                        <ul style={{ 
+                          listStyle: 'none', 
+                          padding: 0, 
+                          margin: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}>
+                          {suggestion.actionItems.map((action, actionIndex) => (
+                            <li key={actionIndex} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              fontSize: '13px',
+                              color: '#4a5568'
+                            }}>
+                              <CheckCircle style={{ 
+                                height: '14px', 
+                                width: '14px', 
+                                color: '#10B981',
+                                flexShrink: 0
+                              }} />
+                              {action}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
