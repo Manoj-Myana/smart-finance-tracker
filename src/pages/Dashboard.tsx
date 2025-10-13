@@ -15,7 +15,8 @@ import {
   Activity,
   Wallet,
   Star,
-  Bell
+  Bell,
+  FileText
 } from 'lucide-react';
 
 interface UserType {
@@ -24,9 +25,52 @@ interface UserType {
   email: string;
 }
 
+interface Transaction {
+  id: number;
+  user_id: number;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  frequency: 'regular' | 'irregular';
+  created_at: string;
+}
+
+interface Goal {
+  id: number;
+  user_id: number;
+  target_date: string;
+  description: string;
+  amount: number;
+  created_at: string;
+}
+
+interface DashboardStats {
+  totalBalance: number;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  incomeChange: number;
+  expenseChange: number;
+  recentTransactions: Transaction[];
+  totalGoals: number;
+  totalGoalAmount: number;
+  achievedGoalPercentage: number;
+}
+
 const Dashboard: React.FC = () => {
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    totalBalance: 0,
+    monthlyIncome: 0,
+    monthlyExpenses: 0,
+    incomeChange: 0,
+    expenseChange: 0,
+    recentTransactions: [],
+    totalGoals: 0,
+    totalGoalAmount: 0,
+    achievedGoalPercentage: 0
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,30 +86,250 @@ const Dashboard: React.FC = () => {
     try {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
+      fetchDashboardData(parsedUser.id);
     } catch (error) {
       console.error('Error parsing user data:', error);
       navigate('/login');
-    } finally {
-      setLoading(false);
     }
   }, [navigate]);
+
+  const fetchDashboardData = async (userId: number) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      console.log('Dashboard: Fetching data for user ID:', userId);
+      console.log('Dashboard: Using token:', token ? 'Token exists' : 'No token');
+      
+      // Fetch transactions
+      const transactionsResponse = await fetch(`http://localhost:5000/api/transactions/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Fetch goals
+      const goalsResponse = await fetch(`http://localhost:5000/api/goals/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Dashboard: Transactions response status:', transactionsResponse.status);
+      console.log('Dashboard: Goals response status:', goalsResponse.status);
+
+      if (transactionsResponse.ok && goalsResponse.ok) {
+        const transactions = await transactionsResponse.json();
+        const goalsData = await goalsResponse.json();
+        
+        console.log('Dashboard: Fetched transactions:', transactions);
+        console.log('Dashboard: Fetched goals:', goalsData);
+        
+        // Extract goals array from response
+        const goals = goalsData.success ? goalsData.goals : [];
+        console.log('Dashboard: Extracted goals array:', goals);
+        
+        calculateDashboardStats(transactions, goals);
+      } else {
+        console.error('Dashboard: Failed to fetch data');
+        console.error('Dashboard: Transactions response:', transactionsResponse.status, transactionsResponse.statusText);
+        console.error('Dashboard: Goals response:', goalsResponse.status, goalsResponse.statusText);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Dashboard: Error fetching data:', error);
+      setLoading(false);
+    }
+  };
+
+  const calculateDashboardStats = (transactions: Transaction[], goals: Goal[]) => {
+    try {
+      console.log('Dashboard: Starting calculation with:', transactions.length, 'transactions and', goals.length, 'goals');
+      
+      // Calculate current month's income and expenses
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+      
+      console.log('Dashboard: Current month:', currentMonth, 'Current year:', currentYear);
+      
+      const currentMonthTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        const isCurrentMonth = transactionDate.getMonth() === currentMonth && 
+               transactionDate.getFullYear() === currentYear;
+        if (isCurrentMonth) {
+          console.log('Dashboard: Current month transaction:', t);
+        }
+        return isCurrentMonth;
+      });
+
+      console.log('Dashboard: Current month transactions:', currentMonthTransactions.length);
+
+      const previousMonthTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        return transactionDate.getMonth() === prevMonth && 
+               transactionDate.getFullYear() === prevYear;
+      });
+
+      // Current month calculations
+      const monthlyIncome = currentMonthTransactions
+        .filter(t => t.type === 'credit')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const monthlyExpenses = currentMonthTransactions
+        .filter(t => t.type === 'debit')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      console.log('Dashboard: Monthly income:', monthlyIncome);
+      console.log('Dashboard: Monthly expenses:', monthlyExpenses);
+
+      // Previous month calculations for comparison
+      const prevMonthlyIncome = previousMonthTransactions
+        .filter(t => t.type === 'credit')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const prevMonthlyExpenses = previousMonthTransactions
+        .filter(t => t.type === 'debit')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      // Calculate percentage changes
+      const incomeChange = prevMonthlyIncome > 0 
+        ? ((monthlyIncome - prevMonthlyIncome) / prevMonthlyIncome) * 100 
+        : 0;
+
+      const expenseChange = prevMonthlyExpenses > 0 
+        ? ((monthlyExpenses - prevMonthlyExpenses) / prevMonthlyExpenses) * 100 
+        : 0;
+
+      // Calculate total balance (all-time income - expenses)
+      const totalIncome = transactions
+        .filter(t => t.type === 'credit')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const totalExpenses = transactions
+        .filter(t => t.type === 'debit')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const totalBalance = totalIncome - totalExpenses;
+
+      console.log('Dashboard: Total income:', totalIncome);
+      console.log('Dashboard: Total expenses:', totalExpenses);
+      console.log('Dashboard: Total balance:', totalBalance);
+
+      // Get recent transactions (last 5)
+      const sortedTransactions = [...transactions]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
+
+      console.log('Dashboard: Recent transactions:', sortedTransactions);
+
+      // Calculate goals statistics
+      const safeGoals = Array.isArray(goals) ? goals : [];
+      console.log('Dashboard: Processing goals:', safeGoals);
+      
+      const totalGoalAmount = safeGoals.reduce((sum, goal) => sum + goal.amount, 0);
+      const achievedGoalPercentage = totalGoalAmount > 0 
+        ? Math.min((totalBalance / totalGoalAmount) * 100, 100) 
+        : 0;
+
+      console.log('Dashboard: Goals count:', goals.length);
+      console.log('Dashboard: Total goal amount:', totalGoalAmount);
+
+      const finalStats = {
+        totalBalance,
+        monthlyIncome,
+        monthlyExpenses,
+        incomeChange,
+        expenseChange,
+        recentTransactions: sortedTransactions,
+        totalGoals: safeGoals.length,
+        totalGoalAmount,
+        achievedGoalPercentage
+      };
+
+      console.log('Dashboard: Final stats:', finalStats);
+
+      setDashboardStats(finalStats);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error calculating dashboard stats:', error);
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) return 'Today';
+    if (diffDays === 2) return 'Yesterday';
+    if (diffDays <= 7) return `${diffDays - 1} days ago`;
+    
+    return date.toLocaleDateString('en-IN', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    });
+  };
 
   if (loading) {
     return (
       <div 
-        className="min-h-screen flex items-center justify-center"
         style={{
-          background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0, #cbd5e1)',
-          backgroundAttachment: 'fixed',
-          minHeight: '100vh'
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}
       >
-        <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-gray-600 rounded-full animate-pulse"></div>
-            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            position: 'relative',
+            marginBottom: '24px'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              border: '4px solid rgba(255,255,255,0.3)',
+              borderRadius: '50%',
+              animation: 'pulse 2s infinite'
+            }}></div>
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              width: '64px',
+              height: '64px',
+              border: '4px solid white',
+              borderTop: '4px solid transparent',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }}></div>
           </div>
-          <p className="text-gray-600 mt-4 font-medium">Loading your dashboard...</p>
+          <p style={{ 
+            color: 'white', 
+            fontSize: '18px',
+            fontWeight: '500',
+            margin: '0'
+          }}>
+            Loading your financial dashboard...
+          </p>
         </div>
       </div>
     );
@@ -73,123 +337,421 @@ const Dashboard: React.FC = () => {
 
   return (
     <div 
-      className="min-h-screen"
       style={{
-        background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0, #cbd5e1) !important',
-        backgroundAttachment: 'fixed',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
         minHeight: '100vh',
-        width: '100%',
-        position: 'relative',
-        zIndex: 1
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        position: 'relative'
       }}
     >
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main style={{
+        maxWidth: '1400px',
+        margin: '0 auto',
+        padding: '40px 24px'
+      }}>
         {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start mb-6">
+        <div style={{ marginBottom: '48px' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '32px'
+          }}>
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                Welcome back, <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">{user?.fullName?.split(' ')[0]}</span>! 👋
+              <h1 style={{
+                fontSize: '48px',
+                fontWeight: '800',
+                color: 'white',
+                marginBottom: '12px',
+                textShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                lineHeight: '1.1'
+              }}>
+                Welcome back, <span style={{
+                  background: 'linear-gradient(135deg, #ffd89b 0%, #19547b 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>{user?.fullName?.split(' ')[0]}</span>! 👋
               </h1>
-              <p className="text-gray-700 text-lg font-medium">
-                Here's what's happening with your money today
+              <p style={{
+                color: 'rgba(255,255,255,0.9)',
+                fontSize: '20px',
+                fontWeight: '500',
+                margin: '0'
+              }}>
+                Here's what's happening with your finances today
               </p>
             </div>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '24px',
+          marginBottom: '48px'
+        }}>
           {/* Total Balance Card */}
           <div 
-            className="backdrop-blur-sm rounded-2xl shadow-lg border border-green-100/50 p-6 hover:shadow-xl transition-all"
             style={{
-              backgroundColor: 'rgba(240, 253, 244, 0.9)',
-              backgroundImage: 'none'
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '24px',
+              padding: '32px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-8px)';
+              e.currentTarget.style.boxShadow = '0 32px 64px rgba(0,0,0,0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
             }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-green-100 rounded-xl">
-                <DollarSign className="h-6 w-6 text-green-600" />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '24px'
+            }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 10px 30px rgba(34, 197, 94, 0.3)'
+              }}>
+                <DollarSign style={{ color: 'white', width: '32px', height: '32px' }} />
               </div>
-              <div className="flex items-center gap-1 text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                <ArrowUpRight className="h-3 w-3" />
-                <span className="text-xs font-semibold">+12.5%</span>
+              <div style={{
+                background: dashboardStats.totalBalance >= 0 
+                  ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' 
+                  : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                color: dashboardStats.totalBalance >= 0 ? '#15803d' : '#dc2626',
+                padding: '8px 16px',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                {dashboardStats.totalBalance >= 0 ? '↗ Positive' : '↘ Negative'}
               </div>
             </div>
-            <p className="text-gray-700 text-sm font-medium mb-1">Total Balance</p>
-            <p className="text-3xl font-bold text-gray-900">₹24,50,000</p>
-            <p className="text-xs text-gray-600 mt-1">All accounts combined</p>
+            <p style={{
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: '16px',
+              fontWeight: '500',
+              marginBottom: '8px',
+              margin: '0 0 8px 0'
+            }}>Total Balance</p>
+            <p style={{
+              color: 'white',
+              fontSize: '36px',
+              fontWeight: '800',
+              marginBottom: '8px',
+              margin: '0 0 8px 0'
+            }}>{formatCurrency(dashboardStats.totalBalance)}</p>
+            <p style={{
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '14px',
+              margin: '0'
+            }}>Net worth from all transactions</p>
           </div>
 
           {/* Monthly Income Card */}
           <div 
-            className="backdrop-blur-sm rounded-2xl shadow-lg border border-blue-100/50 p-6 hover:shadow-xl transition-all"
             style={{
-              backgroundColor: 'rgba(239, 246, 255, 0.9)',
-              backgroundImage: 'none'
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '24px',
+              padding: '32px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-8px)';
+              e.currentTarget.style.boxShadow = '0 32px 64px rgba(0,0,0,0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
             }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-blue-100 rounded-xl">
-                <TrendingUp className="h-6 w-6 text-blue-600" />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '24px'
+            }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
+              }}>
+                <TrendingUp style={{ color: 'white', width: '32px', height: '32px' }} />
               </div>
-              <div className="flex items-center gap-1 text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                <ArrowUpRight className="h-3 w-3" />
-                <span className="text-xs font-semibold">+8.2%</span>
+              <div style={{
+                background: dashboardStats.incomeChange >= 0 
+                  ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' 
+                  : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                color: dashboardStats.incomeChange >= 0 ? '#1e40af' : '#dc2626',
+                padding: '8px 16px',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                {dashboardStats.incomeChange >= 0 ? '↗' : '↘'}
+                {dashboardStats.incomeChange >= 0 ? '+' : ''}{dashboardStats.incomeChange.toFixed(1)}%
               </div>
             </div>
-            <p className="text-gray-700 text-sm font-medium mb-1">Monthly Income</p>
-            <p className="text-3xl font-bold text-gray-900">₹8,20,000</p>
-            <p className="text-xs text-gray-600 mt-1">From 3 sources</p>
+            <p style={{
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: '16px',
+              fontWeight: '500',
+              marginBottom: '8px',
+              margin: '0 0 8px 0'
+            }}>Monthly Income</p>
+            <p style={{
+              color: 'white',
+              fontSize: '36px',
+              fontWeight: '800',
+              marginBottom: '8px',
+              margin: '0 0 8px 0'
+            }}>{formatCurrency(dashboardStats.monthlyIncome)}</p>
+            <p style={{
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '14px',
+              margin: '0'
+            }}>This month's earnings</p>
           </div>
 
           {/* Monthly Expenses Card */}
           <div 
-            className="backdrop-blur-sm rounded-2xl shadow-lg border border-red-100/50 p-6 hover:shadow-xl transition-all"
             style={{
-              backgroundColor: 'rgba(254, 242, 242, 0.9)',
-              backgroundImage: 'none'
+              background: 'rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '20px',
+              padding: '24px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer',
+              backgroundImage: 'linear-gradient(135deg, rgba(255, 241, 235, 0.4) 0%, rgba(254, 232, 222, 0.4) 100%)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-8px)';
+              e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-red-100 rounded-xl">
-                <TrendingDown className="h-6 w-6 text-red-600" />
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              marginBottom: '20px' 
+            }}>
+              <div style={{
+                padding: '16px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(251, 113, 133, 0.2) 0%, rgba(239, 68, 68, 0.2) 100%)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(251, 113, 133, 0.3)'
+              }}>
+                <TrendingDown style={{ 
+                  height: '24px', 
+                  width: '24px', 
+                  color: '#dc2626' 
+                }} />
               </div>
-              <div className="flex items-center gap-1 text-red-600 bg-red-100 px-2 py-1 rounded-full">
-                <ArrowDownRight className="h-3 w-3" />
-                <span className="text-xs font-semibold">-3.1%</span>
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  background: dashboardStats.expenseChange <= 0 
+                    ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)'
+                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%)',
+                  color: dashboardStats.expenseChange <= 0 ? '#16a34a' : '#dc2626',
+                  border: `1px solid ${dashboardStats.expenseChange <= 0 ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  backdropFilter: 'blur(8px)'
+                }}
+              >
+                {dashboardStats.expenseChange <= 0 ? (
+                  <ArrowDownRight style={{ height: '12px', width: '12px' }} />
+                ) : (
+                  <ArrowUpRight style={{ height: '12px', width: '12px' }} />
+                )}
+                <span>
+                  {dashboardStats.expenseChange >= 0 ? '+' : ''}{dashboardStats.expenseChange.toFixed(1)}%
+                </span>
               </div>
             </div>
-            <p className="text-gray-700 text-sm font-medium mb-1">Monthly Expenses</p>
-            <p className="text-3xl font-bold text-gray-900">₹3,75,000</p>
-            <p className="text-xs text-gray-600 mt-1">Across 12 categories</p>
+            <p style={{ 
+              color: 'rgba(75, 85, 99, 0.8)', 
+              fontSize: '14px', 
+              fontWeight: '500', 
+              marginBottom: '6px',
+              letterSpacing: '0.025em'
+            }}>
+              Monthly Expenses
+            </p>
+            <p style={{ 
+              fontSize: '32px', 
+              fontWeight: '700', 
+              color: '#1f2937',
+              margin: 0,
+              background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+              {formatCurrency(dashboardStats.monthlyExpenses)}
+            </p>
+            <p style={{ 
+              fontSize: '12px', 
+              color: 'rgba(107, 114, 128, 0.7)', 
+              marginTop: '6px',
+              letterSpacing: '0.025em'
+            }}>
+              This month's spending
+            </p>
           </div>
 
           {/* Savings Goal Card */}
           <div 
-            className="backdrop-blur-sm rounded-2xl shadow-lg border border-purple-100/50 p-6 hover:shadow-xl transition-all"
             style={{
-              backgroundColor: 'rgba(250, 245, 255, 0.9)',
-              backgroundImage: 'none'
+              background: 'rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '20px',
+              padding: '24px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer',
+              backgroundImage: 'linear-gradient(135deg, rgba(250, 245, 255, 0.4) 0%, rgba(243, 232, 255, 0.4) 100%)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-8px)';
+              e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-purple-100 rounded-xl">
-                <Target className="h-6 w-6 text-purple-600" />
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              marginBottom: '20px' 
+            }}>
+              <div style={{
+                padding: '16px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 69, 219, 0.2) 100%)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(168, 85, 247, 0.3)'
+              }}>
+                <Target style={{ 
+                  height: '24px', 
+                  width: '24px', 
+                  color: '#8b5cf6' 
+                }} />
               </div>
-              <div className="flex items-center gap-1 text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
-                <span className="text-xs font-semibold">73%</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '600',
+                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 69, 219, 0.2) 100%)',
+                color: '#8b5cf6',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                backdropFilter: 'blur(8px)'
+              }}>
+                <span>{Math.round(dashboardStats.achievedGoalPercentage)}%</span>
               </div>
             </div>
-            <p className="text-gray-700 text-sm font-medium mb-1">Savings Goal</p>
-            <p className="text-3xl font-bold text-gray-900">₹7,30,000</p>
-            <div className="mt-3">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-purple-600 h-2 rounded-full w-3/4 transition-all"></div>
+            <p style={{ 
+              color: 'rgba(75, 85, 99, 0.8)', 
+              fontSize: '14px', 
+              fontWeight: '500', 
+              marginBottom: '6px',
+              letterSpacing: '0.025em'
+            }}>
+              Goals Progress
+            </p>
+            <p style={{ 
+              fontSize: '32px', 
+              fontWeight: '700', 
+              color: '#1f2937',
+              margin: 0,
+              background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+              {formatCurrency(dashboardStats.totalGoalAmount)}
+            </p>
+            <div style={{ marginTop: '16px' }}>
+              <div style={{
+                width: '100%',
+                height: '8px',
+                borderRadius: '10px',
+                background: 'rgba(209, 213, 219, 0.3)',
+                backdropFilter: 'blur(4px)',
+                overflow: 'hidden',
+                border: '1px solid rgba(209, 213, 219, 0.2)'
+              }}>
+                <div 
+                  style={{
+                    height: '100%',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(90deg, #8b5cf6 0%, #a855f7 50%, #c084fc 100%)',
+                    transition: 'all 0.5s ease',
+                    width: `${Math.min(dashboardStats.achievedGoalPercentage, 100)}%`,
+                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)'
+                  }}
+                ></div>
               </div>
-              <p className="text-xs text-gray-600 mt-2">₹2,70,000 to go</p>
+              <p style={{ 
+                fontSize: '12px', 
+                color: 'rgba(107, 114, 128, 0.7)', 
+                marginTop: '10px',
+                letterSpacing: '0.025em'
+              }}>
+                {dashboardStats.totalGoals > 0 
+                  ? `${dashboardStats.totalGoals} goals • ${formatCurrency(Math.max(0, dashboardStats.totalGoalAmount - dashboardStats.totalBalance))} to go`
+                  : 'No goals set yet'
+                }
+              </p>
             </div>
           </div>
         </div>
@@ -197,120 +759,418 @@ const Dashboard: React.FC = () => {
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Quick Actions */}
-          <div className="lg:col-span-2 space-y-6">
+          <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div 
-              className="backdrop-blur-sm rounded-2xl shadow-lg border border-orange-100/50 p-6"
               style={{
-                backgroundColor: 'rgba(255, 247, 237, 0.8)',
-                backgroundImage: 'none'
+                background: 'rgba(255, 255, 255, 0.25)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                backgroundImage: 'linear-gradient(135deg, rgba(255, 247, 237, 0.4) 0%, rgba(254, 235, 200, 0.4) 100%)'
               }}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900">Quick Actions</h3>
-                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline">View All</button>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                marginBottom: '24px' 
+              }}>
+                <h3 style={{ 
+                  fontSize: '24px', 
+                  fontWeight: '700', 
+                  color: '#1f2937',
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>
+                  Quick Actions
+                </h3>
+                <button style={{ 
+                  fontSize: '14px', 
+                  color: '#3b82f6', 
+                  fontWeight: '500',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#1d4ed8';
+                  e.currentTarget.style.textDecoration = 'underline';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#3b82f6';
+                  e.currentTarget.style.textDecoration = 'none';
+                }}>
+                  View All
+                </button>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <button className="group flex flex-col items-center p-4 bg-gradient-to-br from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform">
-                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
-                    <Wallet className="h-6 w-6" />
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                gap: '16px' 
+              }}>
+                <button 
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '20px 16px',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 20px rgba(59, 130, 246, 0.3)',
+                    transform: 'translateY(0)'
+                  }}
+                  onClick={() => navigate('/analytics')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.4)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(59, 130, 246, 0.3)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)';
+                  }}
+                >
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    marginBottom: '12px',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(8px)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <PieChart style={{ height: '24px', width: '24px' }} />
                   </div>
-                  <span className="text-sm font-semibold">Add Account</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>View Analytics</span>
                 </button>
                 
                 <button 
-                  className="group flex flex-col items-center p-4 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform"
                   style={{
-                    background: 'linear-gradient(to bottom right, #22c55e, #059669)',
-                    transition: 'all 0.3s ease'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '20px 16px',
+                    background: 'linear-gradient(135deg, #22c55e 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 20px rgba(34, 197, 94, 0.3)',
+                    transform: 'translateY(0)'
                   }}
+                  onClick={() => navigate('/transactions')}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to bottom right, #16a34a, #047857)';
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(34, 197, 94, 0.4)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #16a34a 0%, #047857 100%)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to bottom right, #22c55e, #059669)';
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(34, 197, 94, 0.3)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #22c55e 0%, #059669 100%)';
                   }}
                 >
-                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
-                    <TrendingUp className="h-6 w-6" />
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    marginBottom: '12px',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(8px)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <TrendingUp style={{ height: '24px', width: '24px' }} />
                   </div>
-                  <span className="text-sm font-semibold">Add Income</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>Add Income</span>
                 </button>
                 
-                <button className="group flex flex-col items-center p-4 bg-gradient-to-br from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform">
-                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
-                    <TrendingDown className="h-6 w-6" />
+                <button 
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '20px 16px',
+                    background: 'linear-gradient(135deg, #ea580c 0%, #dc2626 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 20px rgba(234, 88, 12, 0.3)',
+                    transform: 'translateY(0)'
+                  }}
+                  onClick={() => navigate('/transactions')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(234, 88, 12, 0.4)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #c2410c 0%, #b91c1c 100%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(234, 88, 12, 0.3)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #ea580c 0%, #dc2626 100%)';
+                  }}
+                >
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    marginBottom: '12px',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(8px)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <TrendingDown style={{ height: '24px', width: '24px' }} />
                   </div>
-                  <span className="text-sm font-semibold">Add Expense</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>Add Expense</span>
                 </button>
                 
-                <button className="group flex flex-col items-center p-4 bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 transform">
-                  <div className="p-3 bg-white/10 rounded-lg mb-3 group-hover:bg-white/20 transition-all">
-                    <CreditCard className="h-6 w-6" />
+                <button 
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '20px 16px',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 20px rgba(139, 92, 246, 0.3)',
+                    transform: 'translateY(0)'
+                  }}
+                  onClick={() => navigate('/goals')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(139, 92, 246, 0.4)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #7c3aed 0%, #db2777 100%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(139, 92, 246, 0.3)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)';
+                  }}
+                >
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    marginBottom: '12px',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(8px)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <Target style={{ height: '24px', width: '24px' }} />
                   </div>
-                  <span className="text-sm font-semibold">Transfer</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>Set Goals</span>
                 </button>
               </div>
             </div>
 
             {/* Recent Transactions */}
             <div 
-              className="backdrop-blur-sm rounded-2xl shadow-lg border border-indigo-100/50 p-6"
               style={{
-                backgroundColor: 'rgba(238, 242, 255, 0.8)',
-                backgroundImage: 'none'
+                background: 'rgba(255, 255, 255, 0.25)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                backgroundImage: 'linear-gradient(135deg, rgba(238, 242, 255, 0.4) 0%, rgba(224, 231, 255, 0.4) 100%)'
               }}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900">Recent Transactions</h3>
-                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline">View All</button>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                marginBottom: '24px' 
+              }}>
+                <h3 style={{ 
+                  fontSize: '24px', 
+                  fontWeight: '700', 
+                  color: '#1f2937',
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>
+                  Recent Transactions
+                </h3>
+                <button 
+                  style={{ 
+                    fontSize: '14px', 
+                    color: '#3b82f6', 
+                    fontWeight: '500',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => navigate('/transactions')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#1d4ed8';
+                    e.currentTarget.style.textDecoration = 'underline';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#3b82f6';
+                    e.currentTarget.style.textDecoration = 'none';
+                  }}
+                >
+                  View All
+                </button>
               </div>
-              <div className="space-y-4">
-                {/* Sample Transaction Items */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-green-100 rounded-xl">
-                      <ArrowUpRight className="h-5 w-5 text-green-600" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {dashboardStats.recentTransactions.length > 0 ? (
+                  dashboardStats.recentTransactions.map((transaction) => (
+                    <div 
+                      key={transaction.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        background: 'rgba(255, 255, 255, 0.4)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '16px',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{
+                          padding: '12px',
+                          borderRadius: '12px',
+                          background: transaction.type === 'credit' 
+                            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)'
+                            : 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%)',
+                          border: `1px solid ${transaction.type === 'credit' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                          backdropFilter: 'blur(8px)'
+                        }}>
+                          {transaction.type === 'credit' ? (
+                            <ArrowUpRight style={{ 
+                              height: '20px', 
+                              width: '20px', 
+                              color: '#16a34a' 
+                            }} />
+                          ) : (
+                            <ArrowDownRight style={{ 
+                              height: '20px', 
+                              width: '20px', 
+                              color: '#dc2626' 
+                            }} />
+                          )}
+                        </div>
+                        <div>
+                          <p style={{ 
+                            fontWeight: '600', 
+                            color: '#1f2937', 
+                            margin: 0, 
+                            marginBottom: '4px',
+                            fontSize: '14px'
+                          }}>
+                            {transaction.description}
+                          </p>
+                          <p style={{ 
+                            fontSize: '12px', 
+                            color: 'rgba(107, 114, 128, 0.8)', 
+                            margin: 0 
+                          }}>
+                            {formatDate(transaction.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <p style={{
+                        fontWeight: '700',
+                        fontSize: '16px',
+                        margin: 0,
+                        color: transaction.type === 'credit' ? '#16a34a' : '#dc2626'
+                      }}>
+                        {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                      </p>
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">Salary Deposit</p>
-                      <p className="text-sm text-gray-500">Today, 2:30 PM</p>
-                    </div>
+                  ))
+                ) : (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '32px 16px',
+                    color: 'rgba(107, 114, 128, 0.8)'
+                  }}>
+                    <Activity style={{ 
+                      height: '48px', 
+                      width: '48px', 
+                      margin: '0 auto 12px auto', 
+                      opacity: 0.5 
+                    }} />
+                    <p style={{ 
+                      fontSize: '18px', 
+                      fontWeight: '500', 
+                      margin: '0 0 4px 0' 
+                    }}>
+                      No transactions yet
+                    </p>
+                    <p style={{ 
+                      fontSize: '14px', 
+                      margin: '0 0 16px 0' 
+                    }}>
+                      Add your first transaction to see it here
+                    </p>
+                    <button 
+                      style={{
+                        padding: '12px 16px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                      }}
+                      onClick={() => navigate('/transactions')}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                      }}
+                    >
+                      Add Transaction
+                    </button>
                   </div>
-                  <p className="font-bold text-green-600">+₹4,20,000</p>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-100 rounded-xl">
-                      <CreditCard className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">Online Shopping</p>
-                      <p className="text-sm text-gray-500">Yesterday, 6:45 PM</p>
-                    </div>
-                  </div>
-                  <p className="font-bold text-red-600">-₹14,599</p>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-orange-100 rounded-xl">
-                      <Activity className="h-5 w-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">Grocery Store</p>
-                      <p className="text-sm text-gray-500">2 days ago, 10:15 AM</p>
-                    </div>
-                  </div>
-                  <p className="font-bold text-red-600">-₹8,732</p>
-                </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Account Overview */}
+            {/* Quick Stats Summary */}
             <div 
               className="backdrop-blur-sm rounded-2xl shadow-lg border border-teal-100/50 p-6"
               style={{
@@ -319,131 +1179,136 @@ const Dashboard: React.FC = () => {
               }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-gray-900">Accounts</h3>
+                <h3 className="text-lg font-bold text-gray-900">Financial Summary</h3>
                 <Eye className="h-5 w-5 text-gray-400" />
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-600 rounded-lg">
-                      <Wallet className="h-4 w-4 text-white" />
+                      <TrendingUp className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900">Main Checking</p>
-                      <p className="text-xs text-gray-500">**** 4532</p>
+                      <p className="font-semibold text-gray-900">Monthly Savings</p>
+                      <p className="text-xs text-gray-500">Income - Expenses</p>
                     </div>
                   </div>
-                  <p className="font-bold text-gray-900">₹18,50,000</p>
+                  <p className="font-bold text-gray-900">
+                    {formatCurrency(dashboardStats.monthlyIncome - dashboardStats.monthlyExpenses)}
+                  </p>
                 </div>
                 
                 <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-green-600 rounded-lg">
-                      <Star className="h-4 w-4 text-white" />
+                      <Target className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900">Savings</p>
-                      <p className="text-xs text-gray-500">**** 7891</p>
+                      <p className="font-semibold text-gray-900">Goals Set</p>
+                      <p className="text-xs text-gray-500">Total objectives</p>
                     </div>
                   </div>
-                  <p className="font-bold text-gray-900">₹6,00,000</p>
+                  <p className="font-bold text-gray-900">{dashboardStats.totalGoals}</p>
                 </div>
               </div>
             </div>
 
-            {/* Monthly Goals */}
+            {/* Navigation Hub */}
             <div 
-              className="backdrop-blur-sm rounded-2xl shadow-lg border border-pink-100/50 p-6"
+              className="backdrop-blur-sm rounded-2xl shadow-lg border border-indigo-100/50 p-6"
               style={{
-                backgroundColor: 'rgba(253, 242, 248, 0.8)',
+                backgroundColor: 'rgba(238, 242, 255, 0.8)',
                 backgroundImage: 'none'
               }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-gray-900">Monthly Goals</h3>
-                <PieChart className="h-5 w-5 text-gray-400" />
+                <h3 className="text-lg font-bold text-gray-900">Quick Navigation</h3>
+                <Activity className="h-5 w-5 text-gray-400" />
               </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-700">Savings</span>
-                    <span className="text-sm font-bold text-gray-900">73%</span>
+              <div className="space-y-3">
+                <button 
+                  className="w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-left"
+                  onClick={() => navigate('/predict')}
+                >
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Activity className="h-4 w-4 text-purple-600" />
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full w-3/4 transition-all"></div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Predict Future</p>
+                    <p className="text-xs text-gray-500">AI-powered predictions</p>
                   </div>
-                </div>
+                </button>
                 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-700">Budget</span>
-                    <span className="text-sm font-bold text-gray-900">45%</span>
+                <button 
+                  className="w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-left"
+                  onClick={() => navigate('/loans')}
+                >
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <CreditCard className="h-4 w-4 text-orange-600" />
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className="bg-green-600 h-2 rounded-full w-2/5 transition-all"></div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Loan Calculator</p>
+                    <p className="text-xs text-gray-500">Plan your loans</p>
                   </div>
-                </div>
+                </button>
+                
+                <button 
+                  className="w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors text-left"
+                  onClick={() => navigate('/reports')}
+                >
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <FileText className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Upload Files</p>
+                    <p className="text-xs text-gray-500">PDF/Excel imports</p>
+                  </div>
+                </button>
               </div>
             </div>
 
-            {/* Upcoming */}
+            {/* AI Insights */}
             <div 
-              className="backdrop-blur-sm rounded-2xl shadow-lg border border-amber-100/50 p-6"
+              className="backdrop-blur-sm rounded-2xl shadow-lg border border-purple-100/50 p-6"
               style={{
-                backgroundColor: 'rgba(255, 251, 235, 0.8)',
+                backgroundColor: 'rgba(250, 245, 255, 0.8)',
                 backgroundImage: 'none'
               }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900">Upcoming</h3>
-                <Calendar className="h-5 w-5 text-gray-400" />
+                <h3 className="text-lg font-bold text-gray-900">AI Insights</h3>
+                <Star className="h-5 w-5 text-gray-400" />
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900">Rent Payment</p>
-                    <p className="text-xs text-gray-500">Due in 3 days</p>
+                <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <p className="text-sm font-semibold text-gray-900">Spending Pattern</p>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">₹1,20,000</p>
+                  <p className="text-xs text-gray-600">
+                    {dashboardStats.monthlyExpenses > dashboardStats.monthlyIncome * 0.7 
+                      ? "High spending this month. Consider budget review."
+                      : "Good spending control this month!"
+                    }
+                  </p>
                 </div>
                 
-                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900">Credit Card</p>
-                    <p className="text-xs text-gray-500">Due in 8 days</p>
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <p className="text-sm font-semibold text-gray-900">Savings Rate</p>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">₹45,000</p>
+                  <p className="text-xs text-gray-600">
+                    {((dashboardStats.monthlyIncome - dashboardStats.monthlyExpenses) / Math.max(dashboardStats.monthlyIncome, 1) * 100).toFixed(1)}% 
+                    savings rate this month
+                  </p>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Getting Started Section */}
-        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl shadow-2xl p-8 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mt-16 -mr-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -mb-12 -ml-12"></div>
-          <div className="relative z-10">
-            <div className="text-center max-w-4xl mx-auto">
-              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-                <Star className="h-4 w-4" />
-                <span className="text-sm font-semibold">Welcome to Smart Finance Tracker</span>
-              </div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Take control of your financial future
-              </h2>
-              <p className="text-indigo-100 mb-8 text-lg max-w-2xl mx-auto leading-relaxed">
-                You've successfully created your account! Start your journey to financial freedom by tracking your 
-                income, expenses, and setting achievable savings goals.
-              </p>
-              <div className="flex flex-wrap justify-center gap-4">
-                <button className="px-8 py-4 bg-white/20 backdrop-blur-sm rounded-2xl hover:bg-white/30 transition-all transform hover:scale-105 border border-white/20 font-semibold">
-                  📚 View Tutorial
-                </button>
-                <button className="px-8 py-4 bg-white text-indigo-600 rounded-2xl hover:bg-indigo-50 transition-all transform hover:scale-105 font-bold shadow-lg">
-                  🚀 Get Started
+                
+                <button 
+                  className="w-full mt-3 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-colors text-sm font-medium"
+                  onClick={() => navigate('/ai-suggestions')}
+                >
+                  Get AI Suggestions
                 </button>
               </div>
             </div>
