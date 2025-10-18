@@ -188,14 +188,8 @@ const AiSuggestions: React.FC = () => {
       const optimizations = generateExpenseOptimizations(transactions, insights);
       setExpenseOptimizations(optimizations);
 
-      // Don't automatically generate Gemini AI suggestions - only when user explicitly requests
-      // The cached suggestions are loaded separately in useEffect
-      // However, if there are no cached suggestions, auto-generate them for better UX
-      if (geminiSuggestions.length === 0 && cachedSuggestions.length === 0) {
-        console.log('No cached Gemini suggestions found, auto-generating new ones...');
-        generateGeminiSuggestions(transactions);
-      }
-
+      // Don't automatically generate Gemini AI suggestions - only show cached ones initially
+      // New suggestions are generated only when user clicks refresh button
       console.log('AI analysis completed with insights:', insights.length);
     } catch (error) {
       console.error('Error analyzing financial data:', error);
@@ -252,9 +246,18 @@ const AiSuggestions: React.FC = () => {
 
   const refreshGeminiSuggestions = async () => {
     if (transactions.length > 0) {
+      console.log('User requested fresh AI suggestions - generating new ones...');
       setIsRefreshing(true);
-      await generateGeminiSuggestions(transactions);
-      setIsRefreshing(false);
+      try {
+        await generateGeminiSuggestions(transactions);
+        console.log('Successfully generated and stored new AI suggestions');
+      } catch (error) {
+        console.error('Failed to generate new AI suggestions:', error);
+      } finally {
+        setIsRefreshing(false);
+      }
+    } else {
+      console.log('No transactions available to generate suggestions');
     }
   };
 
@@ -325,7 +328,7 @@ const AiSuggestions: React.FC = () => {
         setCurrentSuggestionId(latest.id);
         console.log('Loaded cached suggestions:', latest.suggestions.length, 'suggestions from', latest.timestamp);
       } else {
-        console.log('No cached suggestions found, will auto-generate when transactions load');
+        console.log('No cached suggestions found - user can click refresh to generate new ones');
       }
     } catch (error) {
       console.error('Error loading cached suggestions from API:', error);
@@ -344,10 +347,10 @@ const AiSuggestions: React.FC = () => {
             setCurrentSuggestionId(latest.id);
             console.log('Loaded cached suggestions from localStorage fallback');
           } else {
-            console.log('No localStorage suggestions found either, will auto-generate when transactions load');
+            console.log('No localStorage suggestions found either - user can click refresh to generate new ones');
           }
         } else {
-          console.log('No localStorage suggestions found either, will auto-generate when transactions load');
+          console.log('No localStorage suggestions found either - user can click refresh to generate new ones');
         }
       } catch (fallbackError) {
         console.error('Error loading from localStorage fallback:', fallbackError);
@@ -1150,7 +1153,7 @@ const AiSuggestions: React.FC = () => {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
                 }}
-                title="Refresh AI Suggestions"
+                title="Generate Fresh AI Suggestions from Gemini"
               >
                 <RefreshCw style={{ 
                   height: '14px', 
@@ -1231,7 +1234,10 @@ const AiSuggestions: React.FC = () => {
                   color: '#718096', 
                   margin: 0 
                 }}>
-                  Personalized recommendations based on your last 3 months of spending
+                  {cachedSuggestions.length > 0 
+                    ? 'Showing your latest saved insights - click refresh for new recommendations'
+                    : 'Click refresh to generate personalized recommendations based on your spending'
+                  }
                 </p>
               </div>
             </div>
@@ -1388,7 +1394,7 @@ const AiSuggestions: React.FC = () => {
                     animation: 'spin 1s linear infinite' 
                   }} />
                   <span style={{ fontSize: '16px', fontWeight: '500' }}>
-                    {isRefreshing ? 'Refreshing AI insights...' : 'Generating personalized insights...'}
+                    {isRefreshing ? 'Generating fresh AI insights from Gemini...' : 'Generating personalized insights...'}
                   </span>
                 </div>
               </div>
