@@ -64,6 +64,17 @@ interface GeminiSuggestion {
   actionItems: string[];
 }
 
+interface CachedSuggestion {
+  id: string;
+  timestamp: string;
+  suggestions: GeminiSuggestion[];
+  transactionCount: number;
+  userProfile: {
+    name: string;
+    monthlyIncome: number;
+  };
+}
+
 const AiSuggestions: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<UserType | null>(null);
@@ -80,6 +91,12 @@ const AiSuggestions: React.FC = () => {
   // Add Gemini AI suggestions state
   const [geminiSuggestions, setGeminiSuggestions] = useState<GeminiSuggestion[]>([]);
   const [geminiLoading, setGeminiLoading] = useState(false);
+  
+  // Add caching state for AI suggestions
+  const [cachedSuggestions, setCachedSuggestions] = useState<CachedSuggestion[]>([]);
+  const [currentSuggestionId, setCurrentSuggestionId] = useState<string | null>(null);
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     // Get user data from localStorage (matching Transactions page pattern)
@@ -94,6 +111,10 @@ const AiSuggestions: React.FC = () => {
     try {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
+      
+      // Load cached suggestions first for instant display
+      loadCachedSuggestions(parsedUser.id);
+      
       fetchTransactions(parsedUser.id);
     } catch (error) {
       console.error('Error parsing user data:', error);
@@ -162,8 +183,8 @@ const AiSuggestions: React.FC = () => {
       const optimizations = generateExpenseOptimizations(transactions, insights);
       setExpenseOptimizations(optimizations);
 
-      // Generate Gemini AI suggestions
-      await generateGeminiSuggestions(transactions);
+      // Don't automatically generate Gemini AI suggestions - only when user explicitly requests
+      // The cached suggestions are loaded separately in useEffect
 
       console.log('AI analysis completed with insights:', insights.length);
     } catch (error) {
@@ -187,6 +208,12 @@ const AiSuggestions: React.FC = () => {
       );
       
       setGeminiSuggestions(suggestions);
+      
+      // Save to cache
+      if (user && suggestions.length > 0) {
+        saveSuggestionsToCache(user.id, suggestions, transactions.length, userProfile);
+      }
+      
       console.log('Generated Gemini AI suggestions:', suggestions);
     } catch (error) {
       console.error('Error generating Gemini suggestions:', error);
@@ -215,8 +242,96 @@ const AiSuggestions: React.FC = () => {
 
   const refreshGeminiSuggestions = async () => {
     if (transactions.length > 0) {
+      setIsRefreshing(true);
       await generateGeminiSuggestions(transactions);
+      setIsRefreshing(false);
     }
+  };
+
+  // Caching functions for AI suggestions
+  const getCacheKey = (userId: number) => `ai_suggestions_${userId}`;
+
+  const loadCachedSuggestions = (userId: number) => {
+    try {
+      const cacheKey = getCacheKey(userId);
+      const cached = localStorage.getItem(cacheKey);
+      
+      console.log('Loading cache for user:', userId, 'with key:', cacheKey);
+      console.log('Cached data:', cached ? 'Found' : 'Not found');
+      
+      if (cached) {
+        const parsedCache: CachedSuggestion[] = JSON.parse(cached);
+        setCachedSuggestions(parsedCache);
+        
+        console.log('Parsed cache:', parsedCache.length, 'cached suggestion sets');
+        
+        // Load the most recent suggestions if available
+        if (parsedCache.length > 0) {
+          const latest = parsedCache[0]; // Assuming sorted by timestamp desc
+          setGeminiSuggestions(latest.suggestions);
+          setCurrentSuggestionId(latest.id);
+          console.log('Loaded cached suggestions:', latest.suggestions.length, 'suggestions from', latest.timestamp);
+        }
+      } else {
+        console.log('No cached suggestions found for user:', userId);
+      }
+    } catch (error) {
+      console.error('Error loading cached suggestions:', error);
+    }
+  };
+
+  const saveSuggestionsToCache = (
+    userId: number,
+    suggestions: GeminiSuggestion[],
+    transactionCount: number,
+    userProfile: { name: string; monthlyIncome: number }
+  ) => {
+    try {
+      const cacheKey = getCacheKey(userId);
+      const newSuggestion: CachedSuggestion = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        suggestions,
+        transactionCount,
+        userProfile
+      };
+
+      // Get existing cache
+      const existingCache = localStorage.getItem(cacheKey);
+      let cachedSuggestions: CachedSuggestion[] = existingCache ? JSON.parse(existingCache) : [];
+      
+      // Add new suggestion at the beginning
+      cachedSuggestions.unshift(newSuggestion);
+      
+      // Keep only last 10 suggestions to manage storage
+      cachedSuggestions = cachedSuggestions.slice(0, 10);
+      
+      // Save to localStorage
+      localStorage.setItem(cacheKey, JSON.stringify(cachedSuggestions));
+      
+      // Update state
+      setCachedSuggestions(cachedSuggestions);
+      setCurrentSuggestionId(newSuggestion.id);
+      
+      console.log('Saved new suggestions to cache:', suggestions.length, 'suggestions');
+      console.log('Total cached suggestion sets:', cachedSuggestions.length);
+      console.log('Cache key used:', cacheKey);
+    } catch (error) {
+      console.error('Error saving suggestions to cache:', error);
+    }
+  };
+
+  const loadSpecificSuggestion = (suggestionId: string) => {
+    const cached = cachedSuggestions.find(c => c.id === suggestionId);
+    if (cached) {
+      setGeminiSuggestions(cached.suggestions);
+      setCurrentSuggestionId(suggestionId);
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const calculateSpendingInsights = (transactions: Transaction[]): SpendingInsight[] => {
@@ -904,34 +1019,61 @@ const AiSuggestions: React.FC = () => {
             }}>
               <button
                 onClick={refreshGeminiSuggestions}
-                disabled={geminiLoading}
+                disabled={geminiLoading || isRefreshing}
                 style={{
                   background: 'rgba(139, 92, 246, 0.1)',
                   border: '1px solid rgba(139, 92, 246, 0.3)',
                   borderRadius: '8px',
                   padding: '6px',
-                  cursor: geminiLoading ? 'not-allowed' : 'pointer',
+                  cursor: (geminiLoading || isRefreshing) ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s ease',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
                 onMouseEnter={(e) => {
-                  if (!geminiLoading) {
+                  if (!geminiLoading && !isRefreshing) {
                     e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
                 }}
+                title="Refresh AI Suggestions"
               >
                 <RefreshCw style={{ 
                   height: '14px', 
                   width: '14px', 
                   color: '#8B5CF6',
-                  animation: geminiLoading ? 'spin 1s linear infinite' : 'none'
+                  animation: (geminiLoading || isRefreshing) ? 'spin 1s linear infinite' : 'none'
                 }} />
               </button>
+              
+              {/* Show All Suggestions Toggle */}
+              <button
+                onClick={() => setShowAllSuggestions(!showAllSuggestions)}
+                style={{
+                  background: showAllSuggestions ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.1)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontSize: '12px',
+                  color: '#8B5CF6',
+                  fontWeight: '500'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = showAllSuggestions ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.1)';
+                }}
+                title="View All Previous Suggestions"
+              >
+                {showAllSuggestions ? 'Hide History' : 'Show All'}
+              </button>
+              
               <div style={{
                 background: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%)',
                 color: 'white',
@@ -983,7 +1125,140 @@ const AiSuggestions: React.FC = () => {
               </div>
             </div>
 
-            {geminiLoading ? (
+            {/* Suggestions History Selector */}
+            {showAllSuggestions && cachedSuggestions.length > 0 && (
+              <div style={{ 
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.02) 0%, rgba(168, 85, 247, 0.02) 100%)',
+                border: '1px solid rgba(139, 92, 246, 0.1)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#1a202c',
+                  margin: '0 0 12px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <Calendar style={{ height: '16px', width: '16px', color: '#8B5CF6' }} />
+                  Previous AI Suggestions ({cachedSuggestions.length})
+                </h4>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: '12px'
+                }}>
+                  {cachedSuggestions.map((cached, index) => (
+                    <div
+                      key={cached.id}
+                      onClick={() => loadSpecificSuggestion(cached.id)}
+                      style={{
+                        background: currentSuggestionId === cached.id 
+                          ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)'
+                          : 'white',
+                        border: currentSuggestionId === cached.id 
+                          ? '2px solid #8B5CF6'
+                          : '1px solid rgba(139, 92, 246, 0.1)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentSuggestionId !== cached.id) {
+                          e.currentTarget.style.background = 'rgba(139, 92, 246, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentSuggestionId !== cached.id) {
+                          e.currentTarget.style.background = 'white';
+                        }
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        marginBottom: '8px'
+                      }}>
+                        <div>
+                          <p style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#1a202c',
+                            margin: 0
+                          }}>
+                            {formatTimestamp(cached.timestamp)}
+                          </p>
+                          <p style={{
+                            fontSize: '12px',
+                            color: '#718096',
+                            margin: '2px 0 0 0'
+                          }}>
+                            {cached.suggestions.length} suggestions • {cached.transactionCount} transactions
+                          </p>
+                        </div>
+                        {currentSuggestionId === cached.id && (
+                          <CheckCircle style={{ 
+                            height: '16px', 
+                            width: '16px', 
+                            color: '#8B5CF6' 
+                          }} />
+                        )}
+                      </div>
+                      <p style={{
+                        fontSize: '12px',
+                        color: '#4A5568',
+                        margin: 0,
+                        opacity: 0.7
+                      }}>
+                        Monthly Income: ₹{cached.userProfile.monthlyIncome.toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Current Suggestion Info */}
+            {currentSuggestionId && !showAllSuggestions && (
+              <div style={{
+                background: 'rgba(139, 92, 246, 0.05)',
+                border: '1px solid rgba(139, 92, 246, 0.1)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Calendar style={{ height: '14px', width: '14px', color: '#8B5CF6' }} />
+                <span style={{ 
+                  fontSize: '14px', 
+                  color: '#4A5568',
+                  fontWeight: '500'
+                }}>
+                  {(() => {
+                    const current = cachedSuggestions.find(c => c.id === currentSuggestionId);
+                    return current ? `Showing suggestions from ${formatTimestamp(current.timestamp)}` : 'Latest AI Suggestions';
+                  })()}
+                </span>
+                {isRefreshing && (
+                  <span style={{ 
+                    fontSize: '12px', 
+                    color: '#8B5CF6',
+                    fontWeight: '500'
+                  }}>
+                    • Refreshing...
+                  </span>
+                )}
+              </div>
+            )}
+
+            {(geminiLoading || isRefreshing) ? (
               <div style={{ 
                 display: 'flex', 
                 justifyContent: 'center', 
@@ -1002,16 +1277,17 @@ const AiSuggestions: React.FC = () => {
                     animation: 'spin 1s linear infinite' 
                   }} />
                   <span style={{ fontSize: '16px', fontWeight: '500' }}>
-                    Generating personalized insights...
+                    {isRefreshing ? 'Refreshing AI insights...' : 'Generating personalized insights...'}
                   </span>
                 </div>
               </div>
             ) : (
               <div style={{ display: 'grid', gap: '20px' }}>
-                {geminiSuggestions.map((suggestion, index) => (
-                  <div key={index} style={{
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%)',
-                    border: '1px solid rgba(139, 92, 246, 0.1)',
+                {geminiSuggestions.length > 0 ? (
+                  geminiSuggestions.map((suggestion, index) => (
+                    <div key={index} style={{
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%)',
+                      border: '1px solid rgba(139, 92, 246, 0.1)',
                     borderRadius: '16px',
                     padding: '24px',
                     transition: 'all 0.3s ease'
@@ -1117,7 +1393,66 @@ const AiSuggestions: React.FC = () => {
                       </div>
                     )}
                   </div>
-                ))}
+                ))) : (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '40px',
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.02) 0%, rgba(168, 85, 247, 0.02) 100%)',
+                    border: '1px solid rgba(139, 92, 246, 0.1)',
+                    borderRadius: '16px'
+                  }}>
+                    <Brain style={{ 
+                      height: '48px', 
+                      width: '48px', 
+                      color: '#8B5CF6',
+                      margin: '0 auto 16px auto'
+                    }} />
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: '#1a202c',
+                      margin: '0 0 8px 0'
+                    }}>
+                      No AI Suggestions Available
+                    </h3>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#718096',
+                      margin: '0 0 16px 0'
+                    }}>
+                      {cachedSuggestions.length > 0 
+                        ? 'Click "Refresh" to generate new suggestions or select from previous suggestions above.'
+                        : 'Click "Refresh" to generate your first AI-powered financial insights.'
+                      }
+                    </p>
+                    <button
+                      onClick={refreshGeminiSuggestions}
+                      disabled={geminiLoading || isRefreshing}
+                      style={{
+                        background: 'linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 20px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: (geminiLoading || isRefreshing) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        margin: '0 auto'
+                      }}
+                    >
+                      <RefreshCw style={{ 
+                        height: '16px', 
+                        width: '16px',
+                        animation: (geminiLoading || isRefreshing) ? 'spin 1s linear infinite' : 'none'
+                      }} />
+                      {(geminiLoading || isRefreshing) ? 'Generating...' : 'Generate AI Suggestions'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
