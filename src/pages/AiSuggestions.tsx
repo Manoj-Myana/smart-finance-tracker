@@ -22,6 +22,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import geminiService from '../services/geminiService';
+import { aiSuggestionsService, ApiSuggestion } from '../services/aiSuggestionsService';
 
 interface Transaction {
   id: number;
@@ -99,27 +100,31 @@ const AiSuggestions: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    // Get user data from localStorage (matching Transactions page pattern)
-    const userData = localStorage.getItem('userData');
-    const token = localStorage.getItem('authToken');
-    
-    if (!userData || !token) {
-      navigate('/login');
-      return;
-    }
+    const initializeData = async () => {
+      // Get user data from localStorage (matching Transactions page pattern)
+      const userData = localStorage.getItem('userData');
+      const token = localStorage.getItem('authToken');
+      
+      if (!userData || !token) {
+        navigate('/login');
+        return;
+      }
 
-    try {
-      const parsedUser = JSON.parse(userData);
-      setUser(parsedUser);
-      
-      // Load cached suggestions first for instant display
-      loadCachedSuggestions(parsedUser.id);
-      
-      fetchTransactions(parsedUser.id);
-    } catch (error) {
-      console.error('Error parsing user data:', error);
-      navigate('/login');
-    }
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        
+        // Load cached suggestions first for instant display
+        await loadCachedSuggestions(parsedUser.id);
+        
+        fetchTransactions(parsedUser.id);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        navigate('/login');
+      }
+    };
+
+    initializeData();
   }, [navigate]);
 
   const fetchTransactions = async (userId: number) => {
@@ -185,6 +190,11 @@ const AiSuggestions: React.FC = () => {
 
       // Don't automatically generate Gemini AI suggestions - only when user explicitly requests
       // The cached suggestions are loaded separately in useEffect
+      // However, if there are no cached suggestions, auto-generate them for better UX
+      if (geminiSuggestions.length === 0 && cachedSuggestions.length === 0) {
+        console.log('No cached Gemini suggestions found, auto-generating new ones...');
+        generateGeminiSuggestions(transactions);
+      }
 
       console.log('AI analysis completed with insights:', insights.length);
     } catch (error) {
@@ -248,76 +258,177 @@ const AiSuggestions: React.FC = () => {
     }
   };
 
-  // Caching functions for AI suggestions
-  const getCacheKey = (userId: number) => `ai_suggestions_${userId}`;
-
-  const loadCachedSuggestions = (userId: number) => {
+  const deleteSuggestion = async (suggestionId: string) => {
     try {
-      const cacheKey = getCacheKey(userId);
-      const cached = localStorage.getItem(cacheKey);
+      await aiSuggestionsService.deleteSuggestion(suggestionId);
       
-      console.log('Loading cache for user:', userId, 'with key:', cacheKey);
-      console.log('Cached data:', cached ? 'Found' : 'Not found');
+      // Update local state
+      const updatedCache = cachedSuggestions.filter(s => s.id !== suggestionId);
+      setCachedSuggestions(updatedCache);
       
-      if (cached) {
-        const parsedCache: CachedSuggestion[] = JSON.parse(cached);
-        setCachedSuggestions(parsedCache);
-        
-        console.log('Parsed cache:', parsedCache.length, 'cached suggestion sets');
-        
-        // Load the most recent suggestions if available
-        if (parsedCache.length > 0) {
-          const latest = parsedCache[0]; // Assuming sorted by timestamp desc
-          setGeminiSuggestions(latest.suggestions);
-          setCurrentSuggestionId(latest.id);
-          console.log('Loaded cached suggestions:', latest.suggestions.length, 'suggestions from', latest.timestamp);
+      // If deleted suggestion was currently displayed, show the next most recent
+      if (currentSuggestionId === suggestionId) {
+        if (updatedCache.length > 0) {
+          const nextSuggestion = updatedCache[0];
+          setGeminiSuggestions(nextSuggestion.suggestions);
+          setCurrentSuggestionId(nextSuggestion.id);
+        } else {
+          setGeminiSuggestions([]);
+          setCurrentSuggestionId(null);
         }
-      } else {
-        console.log('No cached suggestions found for user:', userId);
       }
+      
+      // Update localStorage backup
+      if (user) {
+        const cacheKey = getCacheKey(user.id);
+        localStorage.setItem(cacheKey, JSON.stringify(updatedCache));
+      }
+      
+      console.log('Deleted suggestion:', suggestionId);
     } catch (error) {
-      console.error('Error loading cached suggestions:', error);
+      console.error('Error deleting suggestion:', error);
+      alert('Failed to delete suggestion. Please try again.');
     }
   };
 
-  const saveSuggestionsToCache = (
+  // Caching functions for AI suggestions
+  const getCacheKey = (userId: number) => `ai_suggestions_${userId}`;
+
+  const loadCachedSuggestions = async (userId: number) => {
+    try {
+      console.log('Loading cached suggestions for user:', userId);
+      
+      const suggestions = await aiSuggestionsService.getSuggestions(userId);
+      
+      console.log('Loaded from API:', suggestions.length, 'cached suggestion sets');
+      
+      // Transform API response to match our interface
+      const transformedSuggestions: CachedSuggestion[] = suggestions.map(apiSuggestion => ({
+        id: apiSuggestion.id,
+        timestamp: apiSuggestion.timestamp,
+        suggestions: apiSuggestion.suggestions.map(suggestionText => ({
+          category: 'Financial Advice',
+          priority: 'medium' as const,
+          suggestion: suggestionText,
+          actionItems: []
+        })),
+        transactionCount: apiSuggestion.transactionCount,
+        userProfile: apiSuggestion.userProfile
+      }));
+      
+      setCachedSuggestions(transformedSuggestions);
+      
+      // Load the most recent suggestions if available
+      if (transformedSuggestions.length > 0) {
+        const latest = transformedSuggestions[0]; // API returns sorted by timestamp desc
+        setGeminiSuggestions(latest.suggestions);
+        setCurrentSuggestionId(latest.id);
+        console.log('Loaded cached suggestions:', latest.suggestions.length, 'suggestions from', latest.timestamp);
+      } else {
+        console.log('No cached suggestions found, will auto-generate when transactions load');
+      }
+    } catch (error) {
+      console.error('Error loading cached suggestions from API:', error);
+      // Fallback to localStorage for now
+      try {
+        const cacheKey = getCacheKey(userId);
+        const cached = localStorage.getItem(cacheKey);
+        
+        if (cached) {
+          const parsedCache: CachedSuggestion[] = JSON.parse(cached);
+          setCachedSuggestions(parsedCache);
+          
+          if (parsedCache.length > 0) {
+            const latest = parsedCache[0];
+            setGeminiSuggestions(latest.suggestions);
+            setCurrentSuggestionId(latest.id);
+            console.log('Loaded cached suggestions from localStorage fallback');
+          } else {
+            console.log('No localStorage suggestions found either, will auto-generate when transactions load');
+          }
+        } else {
+          console.log('No localStorage suggestions found either, will auto-generate when transactions load');
+        }
+      } catch (fallbackError) {
+        console.error('Error loading from localStorage fallback:', fallbackError);
+      }
+    }
+  };
+
+  const saveSuggestionsToCache = async (
     userId: number,
     suggestions: GeminiSuggestion[],
     transactionCount: number,
     userProfile: { name: string; monthlyIncome: number }
   ) => {
     try {
-      const cacheKey = getCacheKey(userId);
+      console.log('Saving suggestions to database for user:', userId);
+      
+      // Extract just the suggestion text for API
+      const suggestionTexts = suggestions.map(s => s.suggestion);
+      
+      const savedSuggestion = await aiSuggestionsService.saveSuggestions({
+        user_id: userId,
+        suggestions: suggestionTexts,
+        transaction_count: transactionCount,
+        user_profile: userProfile
+      });
+      
+      // Transform API response back to our interface
       const newSuggestion: CachedSuggestion = {
-        id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-        suggestions,
-        transactionCount,
-        userProfile
+        id: savedSuggestion.id,
+        timestamp: savedSuggestion.timestamp,
+        suggestions: savedSuggestion.suggestions.map(suggestionText => ({
+          category: 'Financial Advice',
+          priority: 'medium' as const,
+          suggestion: suggestionText,
+          actionItems: []
+        })),
+        transactionCount: savedSuggestion.transactionCount,
+        userProfile: savedSuggestion.userProfile
       };
 
-      // Get existing cache
-      const existingCache = localStorage.getItem(cacheKey);
-      let cachedSuggestions: CachedSuggestion[] = existingCache ? JSON.parse(existingCache) : [];
-      
-      // Add new suggestion at the beginning
-      cachedSuggestions.unshift(newSuggestion);
-      
-      // Keep only last 10 suggestions to manage storage
-      cachedSuggestions = cachedSuggestions.slice(0, 10);
-      
-      // Save to localStorage
-      localStorage.setItem(cacheKey, JSON.stringify(cachedSuggestions));
-      
-      // Update state
-      setCachedSuggestions(cachedSuggestions);
+      // Update state - add new suggestion at the beginning
+      const updatedCache = [newSuggestion, ...cachedSuggestions.slice(0, 9)]; // Keep max 10
+      setCachedSuggestions(updatedCache);
       setCurrentSuggestionId(newSuggestion.id);
       
-      console.log('Saved new suggestions to cache:', suggestions.length, 'suggestions');
-      console.log('Total cached suggestion sets:', cachedSuggestions.length);
-      console.log('Cache key used:', cacheKey);
+      console.log('Saved new suggestions to database:', suggestions.length, 'suggestions');
+      console.log('Updated cache with:', updatedCache.length, 'suggestion sets');
+      
+      // Also save to localStorage as backup
+      const cacheKey = getCacheKey(userId);
+      localStorage.setItem(cacheKey, JSON.stringify(updatedCache));
+      
     } catch (error) {
-      console.error('Error saving suggestions to cache:', error);
+      console.error('Error saving suggestions to database:', error);
+      
+      // Fallback to localStorage only
+      try {
+        const cacheKey = getCacheKey(userId);
+        const newSuggestion: CachedSuggestion = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          suggestions,
+          transactionCount,
+          userProfile
+        };
+
+        const existingCache = localStorage.getItem(cacheKey);
+        let cachedSuggestions: CachedSuggestion[] = existingCache ? JSON.parse(existingCache) : [];
+        
+        cachedSuggestions.unshift(newSuggestion);
+        cachedSuggestions = cachedSuggestions.slice(0, 10);
+        
+        localStorage.setItem(cacheKey, JSON.stringify(cachedSuggestions));
+        
+        setCachedSuggestions(cachedSuggestions);
+        setCurrentSuggestionId(newSuggestion.id);
+        
+        console.log('Saved to localStorage fallback');
+      } catch (fallbackError) {
+        console.error('Error saving to localStorage fallback:', fallbackError);
+      }
     }
   };
 

@@ -62,6 +62,19 @@ CREATE TABLE IF NOT EXISTS goals (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- AI Suggestions table
+CREATE TABLE IF NOT EXISTS ai_suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    suggestions_data TEXT NOT NULL, -- JSON string containing the suggestions array
+    transaction_count INTEGER NOT NULL,
+    monthly_income DECIMAL(15, 2) NOT NULL,
+    user_name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_userId ON user_sessions(userId);
@@ -72,3 +85,5 @@ CREATE INDEX IF NOT EXISTS idx_transactions_accountId ON transactions(accountId)
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transactionDate);
 CREATE INDEX IF NOT EXISTS idx_goals_userId ON goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_goals_target_date ON goals(target_date);
+CREATE INDEX IF NOT EXISTS idx_ai_suggestions_userId ON ai_suggestions(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_suggestions_created_at ON ai_suggestions(created_at);

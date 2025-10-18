@@ -1243,9 +1243,20 @@ app.delete('/api/goals/:goalId', authenticateToken, (req, res) => {
 
 // Test authentication endpoint
 app.get('/api/test-auth', authenticateToken, (req, res) => {
+  console.log('test-auth endpoint called by user:', req.user.userId);
   res.json({
     success: true,
     message: 'Authentication working!',
+    user: req.user
+  });
+});
+
+// Simple AI suggestions test endpoint
+app.get('/api/ai-suggestions-test', authenticateToken, (req, res) => {
+  console.log('AI suggestions test endpoint called by user:', req.user);
+  res.json({
+    success: true,
+    message: 'AI suggestions test endpoint working',
     user: req.user
   });
 });
@@ -1517,6 +1528,218 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ====================================
+// AI SUGGESTIONS ENDPOINTS
+// ====================================
+
+// Get AI suggestions for a user
+app.get('/api/ai-suggestions/:userId', authenticateToken, (req, res) => {
+  console.log('AI Suggestions GET endpoint called with userId:', req.params.userId);
+  console.log('Authenticated user:', req.user);
+  
+  const { userId } = req.params;
+  const { limit = 10 } = req.query;
+  const user = req.user;
+
+  // Check if user is requesting their own suggestions
+  if (parseInt(userId) !== user.userId) {
+    console.log('Access denied: userId mismatch', parseInt(userId), 'vs', user.userId);
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied'
+    });
+  }
+
+  db.all(
+    `SELECT 
+      id,
+      suggestions_data,
+      transaction_count,
+      monthly_income,
+      user_name,
+      created_at,
+      updated_at
+    FROM ai_suggestions 
+    WHERE user_id = ? 
+    ORDER BY created_at DESC 
+    LIMIT ?`,
+    [userId, parseInt(limit)],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching AI suggestions:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch AI suggestions'
+        });
+      }
+
+      // Parse the JSON suggestions data
+      const suggestions = rows.map(row => ({
+        id: row.id.toString(),
+        timestamp: row.created_at,
+        suggestions: JSON.parse(row.suggestions_data),
+        transactionCount: row.transaction_count,
+        userProfile: {
+          name: row.user_name,
+          monthlyIncome: row.monthly_income
+        }
+      }));
+
+      res.json({
+        success: true,
+        suggestions
+      });
+    }
+  );
+});
+
+// Save new AI suggestions
+app.post('/api/ai-suggestions', authenticateToken, (req, res) => {
+  const { user_id, suggestions, transaction_count, user_profile } = req.body;
+  const user = req.user;
+
+  // Check if user is saving their own suggestions
+  if (parseInt(user_id) !== user.userId) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied'
+    });
+  }
+
+  // Validate required fields
+  if (!suggestions || !Array.isArray(suggestions) || suggestions.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Suggestions array is required and cannot be empty'
+    });
+  }
+
+  if (!user_profile || typeof user_profile.monthlyIncome !== 'number') {
+    return res.status(400).json({
+      success: false,
+      message: 'User profile with monthly income is required'
+    });
+  }
+
+  // Clean up old suggestions (keep only last 10)
+  db.run(
+    `DELETE FROM ai_suggestions 
+     WHERE user_id = ? 
+     AND id NOT IN (
+       SELECT id FROM ai_suggestions 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 9
+     )`,
+    [user_id, user_id],
+    function(cleanupErr) {
+      if (cleanupErr) {
+        console.error('Error cleaning up old suggestions:', cleanupErr);
+        // Continue anyway - this is not critical
+      }
+
+      // Insert new suggestion
+      db.run(
+        `INSERT INTO ai_suggestions 
+         (user_id, suggestions_data, transaction_count, monthly_income, user_name, created_at, updated_at) 
+         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [
+          user_id,
+          JSON.stringify(suggestions),
+          transaction_count || 0,
+          user_profile.monthlyIncome,
+          user_profile.name || 'User'
+        ],
+        function(err) {
+          if (err) {
+            console.error('Error saving AI suggestions:', err);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to save AI suggestions'
+            });
+          }
+
+          const suggestionId = this.lastID;
+          
+          // Return the saved suggestion in the same format as get endpoint
+          res.status(201).json({
+            success: true,
+            suggestion: {
+              id: suggestionId.toString(),
+              timestamp: new Date().toISOString(),
+              suggestions,
+              transactionCount: transaction_count || 0,
+              userProfile: user_profile
+            }
+          });
+        }
+      );
+    }
+  );
+});
+
+// Delete specific AI suggestion
+app.delete('/api/ai-suggestions/:suggestionId', authenticateToken, (req, res) => {
+  const { suggestionId } = req.params;
+  const user = req.user;
+
+  // First check if the suggestion belongs to the user
+  db.get(
+    'SELECT user_id FROM ai_suggestions WHERE id = ?',
+    [suggestionId],
+    (err, row) => {
+      if (err) {
+        console.error('Error checking suggestion ownership:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to verify suggestion ownership'
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: 'Suggestion not found'
+        });
+      }
+
+      if (row.user_id !== user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Delete the suggestion
+      db.run(
+        'DELETE FROM ai_suggestions WHERE id = ?',
+        [suggestionId],
+        function(deleteErr) {
+          if (deleteErr) {
+            console.error('Error deleting suggestion:', deleteErr);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to delete suggestion'
+            });
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).json({
+              success: false,
+              message: 'Suggestion not found'
+            });
+          }
+
+          res.json({
+            success: true,
+            message: 'Suggestion deleted successfully'
+          });
+        }
+      );
+    }
+  );
+});
+
 // Test authentication endpoint
 app.get('/api/test-auth', authenticateToken, (req, res) => {
   res.json({
@@ -1526,7 +1749,26 @@ app.get('/api/test-auth', authenticateToken, (req, res) => {
   });
 });
 
-// 404 handler
+// Test AI suggestions endpoint (simple)
+app.get('/api/test-ai', authenticateToken, (req, res) => {
+  console.log('Test AI endpoint called by user:', req.user);
+  res.json({
+    success: true,
+    message: 'AI test endpoint working',
+    user: req.user
+  });
+});
+
+// Test AI suggestions endpoint without auth (for debugging)
+app.get('/api/test-ai-suggestions', (req, res) => {
+  res.json({
+    success: true,
+    message: 'AI suggestions endpoint is accessible',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 handler - must be last
 app.use((req, res) => {
   res.status(404).json({ 
     success: false, 
