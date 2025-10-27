@@ -130,10 +130,25 @@ const Transactions: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Handle amount field with proper decimal precision
+    if (name === 'amount') {
+      // Allow only numbers and decimal point
+      const cleanValue = value.replace(/[^\d.-]/g, '');
+      // Prevent multiple decimal points
+      const parts = cleanValue.split('.');
+      const formattedValue = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleanValue;
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: formattedValue
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleEditTransaction = (transaction: Transaction) => {
@@ -141,7 +156,7 @@ const Transactions: React.FC = () => {
     setFormData({
       date: transaction.date,
       description: transaction.description,
-      amount: transaction.amount.toString(),
+      amount: Number(transaction.amount).toFixed(2).replace(/\.?0+$/, ''),
       type: transaction.type,
       frequency: transaction.frequency
     });
@@ -181,7 +196,7 @@ const Transactions: React.FC = () => {
         user_id: user.id,
         date: formData.date,
         description: formData.description,
-        amount: parseFloat(formData.amount),
+        amount: Math.round(parseFloat(formData.amount) * 100) / 100, // Round to 2 decimal places
         type: formData.type,
         frequency: formData.frequency
       };
