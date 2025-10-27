@@ -13,10 +13,35 @@ import {
   Edit2,
   Trash2,
   Save,
-  XCircle
+  XCircle,
+  Filter,
+  Search,
+  Calendar,
+  IndianRupee
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import Toast from '../components/Toast';
+
+// Add modern animations
+const modernStyles = `
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+`;
 
 // Set up PDF.js worker with local worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = process.env.NODE_ENV === 'development' 
@@ -66,6 +91,19 @@ const Reports: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<ExtractedTransaction>>({});
   
+  // Filter and selection states for extracted transactions
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'none' | 'newest' | 'oldest'>('newest');
+  const [dateRangeFrom, setDateRangeFrom] = useState('');
+  const [dateRangeTo, setDateRangeTo] = useState('');
+  const [specificDate, setSpecificDate] = useState('');
+  const [amountGreaterThan, setAmountGreaterThan] = useState('');
+  const [amountLessThan, setAmountLessThan] = useState('');
+  const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'regular' | 'irregular'>('all');
+  const [dateFilterType, setDateFilterType] = useState<'all' | 'range' | 'specific'>('all');
+  
   // Toast notification states
   const [toastMessage, setToastMessage] = useState<string>('');
   const [showToast, setShowToast] = useState<boolean>(false);
@@ -77,6 +115,84 @@ const Reports: React.FC = () => {
     setToastMessage(message);
     setShowToast(true);
   };
+
+  // Helper functions for filtering and selection
+  const handleSelectTransaction = (transactionId: string) => {
+    setSelectedTransactions(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(transactionId)) {
+        newSelected.delete(transactionId);
+      } else {
+        newSelected.add(transactionId);
+      }
+      return newSelected;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedTransactions.size === filteredExtractedTransactions.length) {
+      setSelectedTransactions(new Set());
+    } else {
+      setSelectedTransactions(new Set(filteredExtractedTransactions.map(t => t.id)));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    setExtractedTransactions(prev => 
+      prev.filter(transaction => !selectedTransactions.has(transaction.id))
+    );
+    setSelectedTransactions(new Set());
+    showToastNotification(`Deleted ${selectedTransactions.size} transactions`);
+  };
+
+  // Filter extracted transactions
+  const filteredExtractedTransactions = extractedTransactions.filter(transaction => {
+    // Type filter
+    let matchesTypeFilter = true;
+    if (filter === 'credit') {
+      matchesTypeFilter = transaction.type === 'credit';
+    } else if (filter === 'debit') {
+      matchesTypeFilter = transaction.type === 'debit';
+    }
+
+    // Search filter
+    const matchesSearch = searchTerm === '' || 
+      transaction.description.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Frequency filter
+    let matchesFrequency = true;
+    if (frequencyFilter !== 'all') {
+      matchesFrequency = transaction.frequency === frequencyFilter;
+    }
+
+    // Date filter
+    let matchesDateFilter = true;
+    if (dateFilterType === 'range' && dateRangeFrom && dateRangeTo) {
+      const transactionDate = new Date(transaction.date);
+      const fromDate = new Date(dateRangeFrom);
+      const toDate = new Date(dateRangeTo);
+      matchesDateFilter = transactionDate >= fromDate && transactionDate <= toDate;
+    } else if (dateFilterType === 'specific' && specificDate) {
+      matchesDateFilter = transaction.date === specificDate;
+    }
+
+    // Amount filter
+    let matchesAmountFilter = true;
+    if (amountGreaterThan && transaction.amount <= parseFloat(amountGreaterThan)) {
+      matchesAmountFilter = false;
+    }
+    if (amountLessThan && transaction.amount >= parseFloat(amountLessThan)) {
+      matchesAmountFilter = false;
+    }
+
+    return matchesTypeFilter && matchesSearch && matchesFrequency && matchesDateFilter && matchesAmountFilter;
+  }).sort((a, b) => {
+    // Apply sorting
+    if (sortBy === 'none') return 0;
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+  });
   
   // Function to fetch existing transactions from the database
   const fetchExistingTransactions = async () => {
@@ -546,13 +662,25 @@ const Reports: React.FC = () => {
   const mergeTransactions = async () => {
     if (!user || extractedTransactions.length === 0) return;
     
+    // Get selected transactions, or filtered transactions if none selected, or all transactions as fallback
+    const transactionsToMerge = selectedTransactions.size > 0 
+      ? extractedTransactions.filter(t => selectedTransactions.has(t.id))
+      : filteredExtractedTransactions.length > 0 
+        ? filteredExtractedTransactions
+        : extractedTransactions;
+    
+    if (transactionsToMerge.length === 0) {
+      showToastNotification('No transactions to merge. Please check your filters or select transactions.');
+      return;
+    }
+    
     setMerging(true);
     
     try {
       const token = localStorage.getItem('authToken');
       
       // Convert extracted transactions to the format expected by the API
-      const transactionsForAPI = extractedTransactions.map((transaction) => ({
+      const transactionsForAPI = transactionsToMerge.map((transaction) => ({
         user_id: user.id,
         date: transaction.date,
         description: transaction.description,
@@ -584,9 +712,21 @@ const Reports: React.FC = () => {
       // Success feedback
       showToastNotification(`Successfully merged ${result.saved_count} transactions to your account!`);
       
-      // Clear the extracted transactions
+      // Clear the extracted transactions and reset filters
       setExtractedTransactions([]);
       setShowExtractedTransactions(false);
+      setSelectedTransactions(new Set());
+      // Reset filters to default
+      setFilter('all');
+      setSearchTerm('');
+      setSortBy('newest');
+      setDateFilterType('all');
+      setDateRangeFrom('');
+      setDateRangeTo('');
+      setSpecificDate('');
+      setAmountGreaterThan('');
+      setAmountLessThan('');
+      setFrequencyFilter('all');
       
       // Refresh existing transactions after merge
       await fetchExistingTransactions();
@@ -1154,6 +1294,7 @@ const Reports: React.FC = () => {
               <h4 style={{ fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>📄 PDF Bank Statements</h4>
               <ul style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.5' }}>
                 <li style={{ marginBottom: '4px' }}>Download official PDF statements from your bank</li>
+                <li style={{ marginBottom: '4px' }}>✅ Currently supports: <strong>Union Bank</strong> and <strong>Indian Bank</strong> PDF statements</li>
                 <li style={{ marginBottom: '4px' }}>Ensure the PDF contains transaction details</li>
                 <li style={{ marginBottom: '4px' }}>Maximum file size: 10MB</li>
                 <li style={{ marginBottom: '4px' }}>AI will extract transaction data automatically</li>
@@ -1202,11 +1343,674 @@ const Reports: React.FC = () => {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827' }}>
-                Extracted Transactions ({extractedTransactions.length} found)
+                Extracted Transactions ({filteredExtractedTransactions.length} of {extractedTransactions.length} shown)
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#4b5563' }}>
                 <AlertCircle style={{ height: '16px', width: '16px' }} />
                 <span>Review before merging</span>
+              </div>
+            </div>
+
+            {/* Modern Filter and Selection Controls */}
+            <div style={{ 
+              marginBottom: '32px', 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '20px', 
+              padding: '2px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}>
+              <div style={{ 
+                backgroundColor: 'white', 
+                borderRadius: '18px', 
+                padding: '28px',
+                position: 'relative'
+              }}>
+                {/* Header */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  marginBottom: '24px',
+                  paddingBottom: '16px',
+                  borderBottom: '2px solid #f3f4f6'
+                }}>
+                  <h4 style={{ 
+                    fontSize: '20px', 
+                    fontWeight: '700', 
+                    color: '#1f2937',
+                    margin: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      borderRadius: '10px',
+                      padding: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Filter style={{ height: '18px', width: '18px', color: 'white' }} />
+                    </div>
+                    Smart Filters
+                  </h4>
+                  <div style={{ 
+                    fontSize: '14px', 
+                    color: '#6b7280',
+                    background: '#f9fafb',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    {filteredExtractedTransactions.length} of {extractedTransactions.length} results
+                  </div>
+                </div>
+
+                {/* Search Section */}
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ 
+                    fontSize: '15px', 
+                    fontWeight: '600', 
+                    color: '#374151', 
+                    marginBottom: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <Search style={{ height: '18px', width: '18px', color: '#667eea' }} />
+                    Search Transactions
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Type to search descriptions..."
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px 20px 14px 48px', 
+                        border: '2px solid #e5e7eb', 
+                        borderRadius: '12px', 
+                        fontSize: '15px',
+                        backgroundColor: '#fafbfc',
+                        transition: 'all 0.3s ease',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.02)'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#667eea';
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = '#fafbfc';
+                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.02)';
+                      }}
+                    />
+                    <Search style={{ 
+                      position: 'absolute', 
+                      left: '16px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)', 
+                      height: '18px', 
+                      width: '18px', 
+                      color: '#9ca3af',
+                      pointerEvents: 'none'
+                    }} />
+                  </div>
+                </div>
+
+                {/* Filter Grid */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+                  gap: '20px', 
+                  marginBottom: '24px' 
+                }}>
+                  {/* Transaction Type */}
+                  <div>
+                    <label style={{ 
+                      fontSize: '15px', 
+                      fontWeight: '600', 
+                      color: '#374151', 
+                      marginBottom: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <TrendingUp style={{ height: '18px', width: '18px', color: '#10b981' }} />
+                      Transaction Type
+                    </label>
+                    <select
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px 16px', 
+                        border: '2px solid #e5e7eb', 
+                        borderRadius: '12px', 
+                        fontSize: '15px',
+                        backgroundColor: '#fafbfc',
+                        color: '#374151',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 12px center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '16px'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#667eea';
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = '#fafbfc';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <option value="all">🔄 All Transactions</option>
+                      <option value="credit">📈 Credit Only</option>
+                      <option value="debit">📉 Debit Only</option>
+                    </select>
+                  </div>
+
+                  {/* Frequency Filter */}
+                  <div>
+                    <label style={{ 
+                      fontSize: '15px', 
+                      fontWeight: '600', 
+                      color: '#374151', 
+                      marginBottom: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        background: 'linear-gradient(45deg, #f59e0b, #d97706)',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '10px'
+                      }}>⚡</div>
+                      Frequency
+                    </label>
+                    <select
+                      value={frequencyFilter}
+                      onChange={(e) => setFrequencyFilter(e.target.value as 'all' | 'regular' | 'irregular')}
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px 16px', 
+                        border: '2px solid #e5e7eb', 
+                        borderRadius: '12px', 
+                        fontSize: '15px',
+                        backgroundColor: '#fafbfc',
+                        color: '#374151',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 12px center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '16px'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#667eea';
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = '#fafbfc';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <option value="all">🔄 All Frequencies</option>
+                      <option value="regular">🔁 Regular</option>
+                      <option value="irregular">⚡ Irregular</option>
+                    </select>
+                  </div>
+
+                  {/* Sort Filter */}
+                  <div>
+                    <label style={{ 
+                      fontSize: '15px', 
+                      fontWeight: '600', 
+                      color: '#374151', 
+                      marginBottom: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <Calendar style={{ height: '18px', width: '18px', color: '#8b5cf6' }} />
+                      Sort by Date
+                    </label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'none' | 'newest' | 'oldest')}
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px 16px', 
+                        border: '2px solid #e5e7eb', 
+                        borderRadius: '12px', 
+                        fontSize: '15px',
+                        backgroundColor: '#fafbfc',
+                        color: '#374151',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        outline: 'none',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 12px center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '16px'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#667eea';
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = '#fafbfc';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <option value="none">➖ No Sorting</option>
+                      <option value="newest">⬇️ Newest First</option>
+                      <option value="oldest">⬆️ Oldest First</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Advanced Filters */}
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #f3f4f6 0%, #f9fafb 100%)',
+                  borderRadius: '16px',
+                  padding: '24px',
+                  marginBottom: '24px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <h5 style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '700', 
+                    color: '#374151', 
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                      borderRadius: '8px',
+                      padding: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Calendar style={{ height: '16px', width: '16px', color: 'white' }} />
+                    </div>
+                    Advanced Filters
+                  </h5>
+
+                  {/* Date Filter */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ 
+                      fontSize: '15px', 
+                      fontWeight: '600', 
+                      color: '#374151', 
+                      marginBottom: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <Calendar style={{ height: '18px', width: '18px', color: '#3b82f6' }} />
+                      Date Range Filter
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <select
+                        value={dateFilterType}
+                        onChange={(e) => setDateFilterType(e.target.value as 'all' | 'range' | 'specific')}
+                        style={{ 
+                          padding: '12px 16px', 
+                          border: '2px solid #e5e7eb', 
+                          borderRadius: '10px', 
+                          fontSize: '14px',
+                          backgroundColor: 'white',
+                          minWidth: '140px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          outline: 'none',
+                          appearance: 'none',
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 12px center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '16px'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#3b82f6';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#e5e7eb';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <option value="all">📅 All Dates</option>
+                        <option value="range">📊 Date Range</option>
+                        <option value="specific">🎯 Specific Date</option>
+                      </select>
+
+                      {dateFilterType === 'range' && (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ 
+                              fontSize: '14px', 
+                              color: '#6b7280', 
+                              fontWeight: '500',
+                              background: '#f3f4f6',
+                              padding: '4px 8px',
+                              borderRadius: '6px'
+                            }}>From</span>
+                            <input
+                              type="date"
+                              value={dateRangeFrom}
+                              onChange={(e) => setDateRangeFrom(e.target.value)}
+                              style={{ 
+                                padding: '12px 16px', 
+                                border: '2px solid #e5e7eb', 
+                                borderRadius: '10px', 
+                                fontSize: '14px',
+                                backgroundColor: 'white',
+                                transition: 'all 0.3s ease',
+                                outline: 'none'
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#3b82f6';
+                                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#e5e7eb';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ 
+                              fontSize: '14px', 
+                              color: '#6b7280', 
+                              fontWeight: '500',
+                              background: '#f3f4f6',
+                              padding: '4px 8px',
+                              borderRadius: '6px'
+                            }}>To</span>
+                            <input
+                              type="date"
+                              value={dateRangeTo}
+                              onChange={(e) => setDateRangeTo(e.target.value)}
+                              style={{ 
+                                padding: '12px 16px', 
+                                border: '2px solid #e5e7eb', 
+                                borderRadius: '10px', 
+                                fontSize: '14px',
+                                backgroundColor: 'white',
+                                transition: 'all 0.3s ease',
+                                outline: 'none'
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#3b82f6';
+                                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#e5e7eb';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {dateFilterType === 'specific' && (
+                        <input
+                          type="date"
+                          value={specificDate}
+                          onChange={(e) => setSpecificDate(e.target.value)}
+                          style={{ 
+                            padding: '12px 16px', 
+                            border: '2px solid #e5e7eb', 
+                            borderRadius: '10px', 
+                            fontSize: '14px',
+                            backgroundColor: 'white',
+                            transition: 'all 0.3s ease',
+                            outline: 'none'
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Amount Filter */}
+                  <div>
+                    <label style={{ 
+                      fontSize: '15px', 
+                      fontWeight: '600', 
+                      color: '#374151', 
+                      marginBottom: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <IndianRupee style={{ height: '18px', width: '18px', color: '#059669' }} />
+                      Amount Range Filter
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: '#059669', 
+                          fontWeight: '600',
+                          background: '#ecfdf5',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #a7f3d0',
+                          minWidth: '80px',
+                          textAlign: 'center'
+                        }}>Min ₹</span>
+                        <input
+                          type="number"
+                          value={amountGreaterThan}
+                          onChange={(e) => setAmountGreaterThan(e.target.value)}
+                          placeholder="0"
+                          style={{ 
+                            flex: '1',
+                            padding: '12px 16px', 
+                            border: '2px solid #e5e7eb', 
+                            borderRadius: '10px', 
+                            fontSize: '14px',
+                            backgroundColor: 'white',
+                            transition: 'all 0.3s ease',
+                            outline: 'none'
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = '#059669';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(5, 150, 105, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: '#dc2626', 
+                          fontWeight: '600',
+                          background: '#fef2f2',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #fecaca',
+                          minWidth: '80px',
+                          textAlign: 'center'
+                        }}>Max ₹</span>
+                        <input
+                          type="number"
+                          value={amountLessThan}
+                          onChange={(e) => setAmountLessThan(e.target.value)}
+                          placeholder="999999"
+                          style={{ 
+                            flex: '1',
+                            padding: '12px 16px', 
+                            border: '2px solid #e5e7eb', 
+                            borderRadius: '10px', 
+                            fontSize: '14px',
+                            backgroundColor: 'white',
+                            transition: 'all 0.3s ease',
+                            outline: 'none'
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = '#dc2626';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(220, 38, 38, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modern Selection Controls */}
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '16px', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  paddingTop: '24px', 
+                  borderTop: '2px solid #f3f4f6',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handleSelectAll}
+                      style={{
+                        padding: '12px 20px',
+                        background: selectedTransactions.size === filteredExtractedTransactions.length 
+                          ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                          : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                      }}
+                    >
+                      {selectedTransactions.size === filteredExtractedTransactions.length ? (
+                        <>
+                          <XCircle style={{ height: '16px', width: '16px' }} />
+                          Deselect All
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle style={{ height: '16px', width: '16px' }} />
+                          Select All Visible
+                        </>
+                      )}
+                    </button>
+                    
+                    {selectedTransactions.size > 0 && (
+                      <button
+                        onClick={handleDeleteSelected}
+                        style={{
+                          padding: '12px 20px',
+                          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                        }}
+                      >
+                        <Trash2 style={{ height: '16px', width: '16px' }} />
+                        Delete Selected
+                      </button>
+                    )}
+                  </div>
+                  
+                  {selectedTransactions.size > 0 && (
+                    <div style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%)',
+                      padding: '8px 16px',
+                      borderRadius: '20px',
+                      border: '1px solid #a78bfa'
+                    }}>
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#7c3aed',
+                        animation: 'pulse 2s infinite'
+                      }}></div>
+                      <span style={{ 
+                        fontSize: '14px', 
+                        color: '#5b21b6',
+                        fontWeight: '600'
+                      }}>
+                        {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''} selected
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1223,6 +2027,14 @@ const Reports: React.FC = () => {
                 <table style={{ width: '100%' }}>
                   <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                     <tr>
+                      <th style={{ textAlign: 'center', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em', width: '60px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTransactions.size === filteredExtractedTransactions.length && filteredExtractedTransactions.length > 0}
+                          onChange={handleSelectAll}
+                          style={{ transform: 'scale(1.2)' }}
+                        />
+                      </th>
                       <th style={{ textAlign: 'left', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
                       <th style={{ textAlign: 'left', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</th>
                       <th style={{ textAlign: 'left', paddingTop: '20px', paddingBottom: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold', color: '#1f2937', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
@@ -1232,7 +2044,7 @@ const Reports: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody style={{ borderTop: '1px solid #f3f4f6' }}>
-                    {extractedTransactions.map((transaction, index) => (
+                    {filteredExtractedTransactions.map((transaction, index) => (
                       <tr 
                         key={transaction.id} 
                         style={{
@@ -1242,6 +2054,16 @@ const Reports: React.FC = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : 'rgba(249, 250, 251, 0.3)'}
                       >
+                        {/* Checkbox Column */}
+                        <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedTransactions.has(transaction.id)}
+                            onChange={() => handleSelectTransaction(transaction.id)}
+                            style={{ transform: 'scale(1.2)' }}
+                          />
+                        </td>
+                        
                         {/* Date Column */}
                         <td style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px', fontSize: '16px', color: '#4b5563', fontWeight: '500' }}>
                           {editingTransaction === transaction.id ? (
@@ -1609,7 +2431,12 @@ const Reports: React.FC = () => {
                 ) : (
                   <>
                     <ArrowRight style={{ height: '24px', width: '24px' }} />
-                    <span>Merge {extractedTransactions.length} Transactions</span>
+                    <span>
+                      Merge {selectedTransactions.size > 0 
+                        ? selectedTransactions.size 
+                        : filteredExtractedTransactions.length} 
+                      {selectedTransactions.size > 0 ? ' Selected' : ''} Transactions
+                    </span>
                   </>
                 )}
               </button>
@@ -1623,8 +2450,11 @@ const Reports: React.FC = () => {
               border: '1px solid #bfdbfe' 
             }}>
               <p style={{ fontSize: '14px', color: '#1e40af' }}>
-                <strong>Review:</strong> Please review the extracted transactions above. All transactions are set to 
-                'irregular' frequency by default. Click "Merge Transactions" to add them to your account.
+                <strong>Review:</strong> Please review the extracted transactions above. Use filters and selection to choose which transactions to merge. 
+                {selectedTransactions.size > 0 
+                  ? ` ${selectedTransactions.size} transactions are currently selected for merging.`
+                  : ` ${filteredExtractedTransactions.length} transactions match your current filters and will be merged.`
+                }
               </p>
             </div>
           </div>
