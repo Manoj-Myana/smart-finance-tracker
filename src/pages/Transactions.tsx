@@ -57,7 +57,7 @@ const Transactions: React.FC = () => {
   const [showToast, setShowToast] = useState<boolean>(false);
   
   // New filter states
-  const [sortBy, setSortBy] = useState<'none' | 'newest' | 'oldest'>('none');
+  const [sortBy, setSortBy] = useState<'none' | 'newest' | 'oldest'>('newest');
   const [dateRangeFrom, setDateRangeFrom] = useState('');
   const [dateRangeTo, setDateRangeTo] = useState('');
   const [specificDate, setSpecificDate] = useState('');
@@ -394,11 +394,11 @@ const Transactions: React.FC = () => {
     
     return matchesTypeFilter && matchesSearch && matchesFrequency && matchesDateFilter && matchesAmountFilter;
   }).sort((a, b) => {
-    // Apply sorting
+    // Apply sorting - prioritize by creation time (when added) rather than transaction date
     if (sortBy === 'none') return 0; // Keep original order
-    const dateA = new Date(a.date).getTime();
-    const dateB = new Date(b.date).getTime();
-    return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+    const createdA = new Date(a.created_at).getTime();
+    const createdB = new Date(b.created_at).getTime();
+    return sortBy === 'newest' ? createdB - createdA : createdA - createdB;
   });
 
   // Calculate totals for all transactions
