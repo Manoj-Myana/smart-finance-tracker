@@ -268,15 +268,15 @@ const DownloadReport: React.FC = () => {
     const baseFileName = `${config.type}_report_${new Date().toISOString().split('T')[0]}`;
     
     if (config.format === 'csv') {
-      // Generate CSV
-      const csvContent = generateCSV(reportData.transactions);
+      // Generate CSV with chart data if enabled
+      const csvContent = generateCSV(reportData.transactions, reportData);
       downloadFile(csvContent, `${baseFileName}.csv`, 'text/csv');
     } else if (config.format === 'excel') {
-      // Generate Excel-compatible CSV with enhanced formatting
+      // Generate Excel-compatible CSV with enhanced formatting and charts
       const excelContent = generateExcelCSV(reportData);
       downloadFile(excelContent, `${baseFileName}.xls`, 'application/vnd.ms-excel');
     } else if (config.format === 'pdf') {
-      // Generate HTML content that can be converted to PDF
+      // Generate HTML content that can be converted to PDF with charts
       const htmlContent = generateHTMLForPDF(reportData);
       // Create a blob with HTML content that browsers can handle
       const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -298,9 +298,27 @@ const DownloadReport: React.FC = () => {
     alert(`Report "${baseFileName}.${config.format}" has been downloaded successfully!`);
   };
 
-  const generateCSV = (transactions: Transaction[]) => {
+  const generateCSV = (transactions: Transaction[], reportData?: any) => {
+    const includeCharts = reportData?.config?.includeCharts || false;
     const headers = ['Date', 'Description', 'Amount', 'Type', 'Frequency', 'Created At'];
-    const csvRows = [headers.join(',')];
+    const csvRows = [];
+    
+    // Add header information if charts are included
+    if (includeCharts && reportData) {
+      csvRows.push(['FINANCIAL REPORT WITH CHARTS']);
+      csvRows.push([`Generated on: ${new Date(reportData.generatedAt).toLocaleDateString()}`]);
+      csvRows.push([`Charts Included: Yes`]);
+      csvRows.push(['']);
+      
+      // Add summary
+      csvRows.push(['SUMMARY']);
+      csvRows.push([`Total Transactions: ${reportData.statistics.totalTransactions}`]);
+      csvRows.push([`Credit vs Debit: ${reportData.statistics.creditTransactions}:${reportData.statistics.debitTransactions}`]);
+      csvRows.push([`Balance: ${formatCurrency(reportData.statistics.balance)}`]);
+      csvRows.push(['']);
+    }
+    
+    csvRows.push(headers);
     
     transactions.forEach(transaction => {
       const row = [
@@ -311,17 +329,20 @@ const DownloadReport: React.FC = () => {
         transaction.frequency,
         transaction.created_at
       ];
-      csvRows.push(row.join(','));
+      csvRows.push(row);
     });
     
-    return csvRows.join('\n');
+    return csvRows.map(row => row.join(',')).join('\n');
   };
 
   const generateExcelCSV = (reportData: any) => {
     const lines = [];
+    const includeCharts = reportData.config?.includeCharts || false;
+    
     lines.push('FINANCIAL REPORT');
     lines.push(`Generated on: ${new Date(reportData.generatedAt).toLocaleDateString()}`);
     lines.push(`User: ${reportData.user?.fullName || 'Unknown'}`);
+    lines.push(`Charts Included: ${includeCharts ? 'Yes' : 'No'}`);
     lines.push('');
     
     // Summary
@@ -331,7 +352,64 @@ const DownloadReport: React.FC = () => {
     lines.push(`Total Debit,${reportData.statistics.totalDebit}`);
     lines.push(`Balance,${reportData.statistics.balance}`);
     lines.push(`Average Transaction,${reportData.statistics.averageTransaction.toFixed(2)}`);
+    lines.push(`Credit Transactions,${reportData.statistics.creditTransactions}`);
+    lines.push(`Debit Transactions,${reportData.statistics.debitTransactions}`);
     lines.push('');
+    
+    // Add chart data if charts are included
+    if (includeCharts) {
+      lines.push('CHART ANALYSIS');
+      lines.push('');
+      
+      // Credit vs Debit Analysis
+      lines.push('CREDIT VS DEBIT BREAKDOWN');
+      lines.push(`Credit Percentage,${((reportData.statistics.creditTransactions/reportData.statistics.totalTransactions)*100).toFixed(1)}%`);
+      lines.push(`Debit Percentage,${((reportData.statistics.debitTransactions/reportData.statistics.totalTransactions)*100).toFixed(1)}%`);
+      lines.push('');
+      
+      // Amount Distribution Analysis
+      lines.push('AMOUNT DISTRIBUTION');
+      const under1k = reportData.transactions.filter((t: Transaction) => t.amount < 1000).length;
+      const between1k5k = reportData.transactions.filter((t: Transaction) => t.amount >= 1000 && t.amount < 5000).length;
+      const between5k10k = reportData.transactions.filter((t: Transaction) => t.amount >= 5000 && t.amount < 10000).length;
+      const above10k = reportData.transactions.filter((t: Transaction) => t.amount >= 10000).length;
+      
+      lines.push(`Under ₹1000,${under1k}`);
+      lines.push(`₹1000-₹5000,${between1k5k}`);
+      lines.push(`₹5000-₹10000,${between5k10k}`);
+      lines.push(`Above ₹10000,${above10k}`);
+      lines.push('');
+      
+      // Frequency Analysis
+      lines.push('FREQUENCY ANALYSIS');
+      const regularCount = reportData.transactions.filter((t: Transaction) => t.frequency === 'regular').length;
+      const irregularCount = reportData.transactions.filter((t: Transaction) => t.frequency === 'irregular').length;
+      lines.push(`Regular Transactions,${regularCount} (${((regularCount/reportData.statistics.totalTransactions)*100).toFixed(1)}%)`);
+      lines.push(`Irregular Transactions,${irregularCount} (${((irregularCount/reportData.statistics.totalTransactions)*100).toFixed(1)}%)`);
+      lines.push('');
+      
+      // Monthly Trend Data
+      const monthlyData = generateMonthlyData(reportData.transactions);
+      lines.push('MONTHLY TRANSACTION TREND');
+      lines.push('Month,Transaction Count');
+      monthlyData.labels.forEach((month: string, index: number) => {
+        lines.push(`${month},${monthlyData.data[index]}`);
+      });
+      lines.push('');
+      
+      // Insights
+      lines.push('FINANCIAL INSIGHTS');
+      const avgAmount = reportData.statistics.averageTransaction;
+      const maxAmount = Math.max(...reportData.transactions.map((t: Transaction) => t.amount));
+      const minAmount = Math.min(...reportData.transactions.map((t: Transaction) => t.amount));
+      
+      lines.push(`Average Transaction Amount,₹${avgAmount.toFixed(2)}`);
+      lines.push(`Highest Transaction,₹${maxAmount.toFixed(2)}`);
+      lines.push(`Lowest Transaction,₹${minAmount.toFixed(2)}`);
+      lines.push(`Spending Pattern,${regularCount > irregularCount ? 'Regular - Good financial habits' : 'Irregular - Consider more structured spending'}`);
+      lines.push(`Balance Status,${reportData.statistics.balance >= 0 ? 'Positive - Healthy finances' : 'Negative - Monitor spending'}`);
+      lines.push('');
+    }
     
     // Transactions
     lines.push('TRANSACTIONS');
@@ -351,13 +429,316 @@ const DownloadReport: React.FC = () => {
     return lines.join('\n');
   };
 
+  const generateChartsHTML = (reportData: any) => {
+    // Calculate statistics for charts
+    const totalTransactions = reportData.statistics.totalTransactions;
+    const creditCount = reportData.statistics.creditTransactions;
+    const debitCount = reportData.statistics.debitTransactions;
+    const creditPercentage = (creditCount / totalTransactions) * 100;
+    const debitPercentage = (debitCount / totalTransactions) * 100;
+    
+    // Amount distribution data
+    const under1k = reportData.transactions.filter((t: Transaction) => t.amount < 1000).length;
+    const between1k5k = reportData.transactions.filter((t: Transaction) => t.amount >= 1000 && t.amount < 5000).length;
+    const between5k10k = reportData.transactions.filter((t: Transaction) => t.amount >= 5000 && t.amount < 10000).length;
+    const above10k = reportData.transactions.filter((t: Transaction) => t.amount >= 10000).length;
+    
+    // Frequency analysis
+    const regularCount = reportData.transactions.filter((t: Transaction) => t.frequency === 'regular').length;
+    const irregularCount = reportData.transactions.filter((t: Transaction) => t.frequency === 'irregular').length;
+    const regularPercentage = (regularCount / totalTransactions) * 100;
+    const irregularPercentage = (irregularCount / totalTransactions) * 100;
+    
+    // Monthly trend data
+    const monthlyData = generateMonthlyData(reportData.transactions);
+    const maxMonthlyCount = Math.max(...monthlyData.data);
+    
+    return `
+    <div class="section charts-section" style="page-break-inside: avoid;">
+        <div class="section-title">📊 Financial Charts & Visual Analysis</div>
+        
+        <!-- Credit vs Debit Pie Chart -->
+        <div class="chart-container" style="margin-bottom: 30px; page-break-inside: avoid;">
+            <div class="chart-title">Credit vs Debit Distribution</div>
+            <div style="display: flex; align-items: center; justify-content: center; margin: 20px 0; gap: 30px;">
+                <!-- Improved Pie Chart using SVG -->
+                <div style="position: relative; width: 200px; height: 200px;">
+                    <svg width="200" height="200" viewBox="0 0 200 200" style="transform: rotate(-90deg);">
+                        <!-- Credit Slice -->
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#28a745" stroke-width="40"
+                                stroke-dasharray="${(creditPercentage / 100) * 502.65} 502.65" 
+                                stroke-dashoffset="0" />
+                        <!-- Debit Slice -->
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#dc3545" stroke-width="40"
+                                stroke-dasharray="${(debitPercentage / 100) * 502.65} 502.65"
+                                stroke-dashoffset="${-(creditPercentage / 100) * 502.65}" />
+                        <!-- Center Circle -->
+                        <circle cx="100" cy="100" r="40" fill="white" stroke="#ddd" stroke-width="2"/>
+                    </svg>
+                    <!-- Center Text -->
+                    <div style="
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        text-align: center;
+                        font-weight: bold;
+                        font-size: 14px;
+                    ">
+                        ${totalTransactions}<br><span style="font-size: 12px; color: #666;">Total</span>
+                    </div>
+                </div>
+                <!-- Legend -->
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 20px; height: 20px; background: #28a745; border-radius: 3px;"></div>
+                        <div>
+                            <div style="font-weight: bold; font-size: 16px;">Credit: ${creditCount}</div>
+                            <div style="color: #666; font-size: 14px;">${creditPercentage.toFixed(1)}% of transactions</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 20px; height: 20px; background: #dc3545; border-radius: 3px;"></div>
+                        <div>
+                            <div style="font-weight: bold; font-size: 16px;">Debit: ${debitCount}</div>
+                            <div style="color: #666; font-size: 14px;">${debitPercentage.toFixed(1)}% of transactions</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Amount Distribution Bar Chart -->
+        <div class="chart-container" style="margin-bottom: 30px; page-break-inside: avoid;">
+            <div class="chart-title">Amount Distribution Analysis</div>
+            <div style="margin: 20px 0;">
+                <!-- Improved Bar Chart with SVG -->
+                <svg width="400" height="180" viewBox="0 0 400 180" style="border: 1px solid #ddd; border-radius: 8px; background: #f8f9fa;">
+                    <!-- Grid lines -->
+                    <defs>
+                        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e0e0e0" stroke-width="1"/>
+                        </pattern>
+                    </defs>
+                    <rect width="400" height="150" fill="url(#grid)" opacity="0.3"/>
+                    
+                    <!-- Bars -->
+                    <rect x="50" y="${150 - Math.max((under1k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          width="60" height="${Math.max((under1k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          fill="url(#grad1)" stroke="#17a2b8" stroke-width="2"/>
+                    <rect x="130" y="${150 - Math.max((between1k5k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          width="60" height="${Math.max((between1k5k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          fill="url(#grad2)" stroke="#28a745" stroke-width="2"/>
+                    <rect x="210" y="${150 - Math.max((between5k10k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          width="60" height="${Math.max((between5k10k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          fill="url(#grad3)" stroke="#ffc107" stroke-width="2"/>
+                    <rect x="290" y="${150 - Math.max((above10k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          width="60" height="${Math.max((above10k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          fill="url(#grad4)" stroke="#dc3545" stroke-width="2"/>
+                    
+                    <!-- Gradients -->
+                    <defs>
+                        <linearGradient id="grad1" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" style="stop-color:#17a2b8;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#20c997;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="grad2" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" style="stop-color:#28a745;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#20c997;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="grad3" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" style="stop-color:#ffc107;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#fd7e14;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="grad4" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" style="stop-color:#dc3545;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#e74c3c;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                    
+                    <!-- Value labels on bars -->
+                    <text x="80" y="${145 - Math.max((under1k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          text-anchor="middle" font-size="12" font-weight="bold" fill="#333">${under1k}</text>
+                    <text x="160" y="${145 - Math.max((between1k5k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          text-anchor="middle" font-size="12" font-weight="bold" fill="#333">${between1k5k}</text>
+                    <text x="240" y="${145 - Math.max((between5k10k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          text-anchor="middle" font-size="12" font-weight="bold" fill="#333">${between5k10k}</text>
+                    <text x="320" y="${145 - Math.max((above10k / Math.max(under1k, between1k5k, between5k10k, above10k)) * 120, 5)}" 
+                          text-anchor="middle" font-size="12" font-weight="bold" fill="#333">${above10k}</text>
+                    
+                    <!-- X-axis labels -->
+                    <text x="80" y="170" text-anchor="middle" font-size="11" fill="#666">Under ₹1K</text>
+                    <text x="160" y="170" text-anchor="middle" font-size="11" fill="#666">₹1K-5K</text>
+                    <text x="240" y="170" text-anchor="middle" font-size="11" fill="#666">₹5K-10K</text>
+                    <text x="320" y="170" text-anchor="middle" font-size="11" fill="#666">Above ₹10K</text>
+                </svg>
+            </div>
+        </div>
+        
+        <!-- Monthly Trend Line Chart -->
+        <div class="chart-container" style="margin-bottom: 30px; page-break-inside: avoid;">
+            <div class="chart-title">Monthly Transaction Trend</div>
+            <div style="margin: 20px 0; position: relative;">
+                <!-- Enhanced Line Chart with SVG -->
+                <svg width="500" height="200" viewBox="0 0 500 200" style="border: 1px solid #ddd; border-radius: 8px; background: #f8f9fa;">
+                    <!-- Grid -->
+                    <defs>
+                        <pattern id="monthlyGrid" width="25" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 25 0 L 0 0 0 20" fill="none" stroke="#e0e0e0" stroke-width="1"/>
+                        </pattern>
+                    </defs>
+                    <rect width="500" height="160" fill="url(#monthlyGrid)" opacity="0.3"/>
+                    
+                    <!-- Trend Line -->
+                    <polyline points="${monthlyData.labels.map((month: string, index: number) => 
+                        `${50 + (index * (400 / Math.max(monthlyData.labels.length - 1, 1)))},${160 - (monthlyData.data[index] / maxMonthlyCount) * 120}`
+                    ).join(' ')}" 
+                    fill="none" stroke="#007bff" stroke-width="3" stroke-linecap="round"/>
+                    
+                    <!-- Data Points -->
+                    ${monthlyData.labels.map((month: string, index: number) => `
+                        <circle cx="${50 + (index * (400 / Math.max(monthlyData.labels.length - 1, 1)))}" 
+                                cy="${160 - (monthlyData.data[index] / maxMonthlyCount) * 120}" 
+                                r="6" fill="#007bff" stroke="white" stroke-width="2"/>
+                        <text x="${50 + (index * (400 / Math.max(monthlyData.labels.length - 1, 1)))}" 
+                              y="${150 - (monthlyData.data[index] / maxMonthlyCount) * 120}" 
+                              text-anchor="middle" font-size="10" font-weight="bold" fill="#333">${monthlyData.data[index]}</text>
+                    `).join('')}
+                    
+                    <!-- X-axis labels -->
+                    ${monthlyData.labels.map((month: string, index: number) => `
+                        <text x="${50 + (index * (400 / Math.max(monthlyData.labels.length - 1, 1)))}" 
+                              y="185" text-anchor="middle" font-size="10" fill="#666">${month}</text>
+                    `).join('')}
+                    
+                    <!-- Y-axis -->
+                    <line x1="40" y1="20" x2="40" y2="160" stroke="#333" stroke-width="2"/>
+                    <!-- X-axis -->
+                    <line x1="40" y1="160" x2="460" y2="160" stroke="#333" stroke-width="2"/>
+                </svg>
+                
+                <!-- Trend Analysis -->
+                <div style="margin-top: 15px; padding: 15px; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #007bff;">
+                    <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">📈 Trend Analysis</div>
+                    <div style="font-size: 12px; color: #666;">
+                        Peak month: <strong>${monthlyData.labels[monthlyData.data.indexOf(maxMonthlyCount)]}</strong> with <strong>${maxMonthlyCount} transactions</strong>
+                        <br>Average monthly transactions: <strong>${(monthlyData.data.reduce((a, b) => a + b, 0) / monthlyData.data.length).toFixed(1)}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Frequency Analysis -->
+        <div class="chart-container" style="margin-bottom: 30px; page-break-inside: avoid;">
+            <div class="chart-title">Transaction Frequency Analysis</div>
+            <div style="margin: 20px 0;">
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <!-- Regular vs Irregular Progress Bars -->
+                    <div style="flex: 1;">
+                        <div style="margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <strong>Regular Transactions</strong>
+                                <span>${regularCount} (${regularPercentage.toFixed(1)}%)</span>
+                            </div>
+                            <div style="background: #e9ecef; height: 20px; border-radius: 10px; overflow: hidden;">
+                                <div style="
+                                    background: linear-gradient(to right, #28a745, #20c997);
+                                    height: 100%;
+                                    width: ${regularPercentage.toFixed(1)}%;
+                                    border-radius: 10px;
+                                "></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <strong>Irregular Transactions</strong>
+                                <span>${irregularCount} (${irregularPercentage.toFixed(1)}%)</span>
+                            </div>
+                            <div style="background: #e9ecef; height: 20px; border-radius: 10px; overflow: hidden;">
+                                <div style="
+                                    background: linear-gradient(to right, #ffc107, #fd7e14);
+                                    height: 100%;
+                                    width: ${irregularPercentage.toFixed(1)}%;
+                                    border-radius: 10px;
+                                "></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #007bff;">
+                    <strong>💡 Financial Insight:</strong> 
+                    ${regularCount > irregularCount 
+                        ? 'Your spending shows regular patterns, indicating good financial discipline and predictable cash flow management.' 
+                        : 'You have more irregular transactions. Consider establishing more structured spending patterns for better financial planning.'}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Key Metrics Summary -->
+        <div class="chart-container" style="page-break-inside: avoid;">
+            <div class="chart-title">📈 Key Financial Metrics</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0;">
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">AVERAGE TRANSACTION</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #28a745;">${formatCurrency(reportData.statistics.averageTransaction)}</div>
+                </div>
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">NET BALANCE</div>
+                    <div style="font-size: 18px; font-weight: bold; color: ${reportData.statistics.balance >= 0 ? '#28a745' : '#dc3545'};">${formatCurrency(reportData.statistics.balance)}</div>
+                </div>
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">HIGHEST TRANSACTION</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #17a2b8;">${formatCurrency(Math.max(...reportData.transactions.map((t: Transaction) => t.amount)))}</div>
+                </div>
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #6f42c1;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">TOTAL TRANSACTIONS</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #6f42c1;">${totalTransactions}</div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+  };
+
+  const generateMonthlyData = (transactions: Transaction[]) => {
+    const monthlyMap = new Map();
+    
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+      monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
+    });
+    
+    const sortedEntries = Array.from(monthlyMap.entries()).sort();
+    return {
+      labels: sortedEntries.map(([key]) => key),
+      data: sortedEntries.map(([, value]) => value)
+    };
+  };
+
+  const generateCategoryData = (transactions: Transaction[]) => {
+    const categoryMap = new Map();
+    
+    transactions.forEach(transaction => {
+      const category = transaction.type;
+      categoryMap.set(category, (categoryMap.get(category) || 0) + transaction.amount);
+    });
+    
+    return Array.from(categoryMap.entries());
+  };
+
   const generateHTMLForPDF = (reportData: any) => {
+    const includeCharts = reportData.config?.includeCharts || false;
+    
+    // Generate chart data if charts are enabled
+    const chartHtml = includeCharts ? generateChartsHTML(reportData) : '';
+    
     return `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>Financial Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -441,6 +822,60 @@ const DownloadReport: React.FC = () => {
         .filter-item { 
             margin-bottom: 5px;
         }
+        .charts-section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        .chart-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        .chart-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #007bff;
+            font-size: 16px;
+        }
+        
+        /* Enhanced print styles */
+        @media print {
+            body { 
+                margin: 0; 
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            .section { 
+                page-break-inside: avoid; 
+                margin-bottom: 20px;
+            }
+            .chart-container {
+                page-break-inside: avoid;
+                border: 2px solid #333 !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            svg {
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            .charts-section {
+                page-break-before: auto;
+                page-break-after: auto;
+                page-break-inside: avoid;
+            }
+        }
+        
+        /* Ensure SVG charts are visible */
+        svg {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
         @media print {
             body { margin: 0; }
             .section { page-break-inside: avoid; }
@@ -452,6 +887,7 @@ const DownloadReport: React.FC = () => {
         <div class="title">Financial Report</div>
         <div class="subtitle">Generated on ${new Date(reportData.generatedAt).toLocaleDateString()}</div>
         <div class="subtitle">User: ${reportData.user?.fullName || 'Unknown'} (${reportData.user?.email || 'Unknown'})</div>
+        ${includeCharts ? '<div class="subtitle">📊 Including Charts and Visual Analysis</div>' : ''}
     </div>
 
     <div class="section">
@@ -465,6 +901,7 @@ const DownloadReport: React.FC = () => {
             ${reportData.filters.searchTerm ? 
                 `<div class="filter-item"><strong>Search:</strong> ${reportData.filters.searchTerm}</div>` : ''}
             <div class="filter-item"><strong>Amount Range:</strong> ${reportData.filters.amountRange}</div>
+            <div class="filter-item"><strong>Charts Included:</strong> ${includeCharts ? 'Yes' : 'No'}</div>
         </div>
     </div>
 
@@ -498,6 +935,7 @@ const DownloadReport: React.FC = () => {
         </div>
     </div>
 
+    ${chartHtml}
     <div class="section">
         <div class="section-title">Transaction Details</div>
         <table class="transaction-table">
@@ -1512,31 +1950,34 @@ const DownloadReport: React.FC = () => {
                 borderRadius: '20px',
                 fontWeight: '700',
                 fontSize: '18px',
-                border: 'none',
+                border: '3px solid rgba(255, 255, 255, 0.2)',
                 cursor: isGenerating || filteredTransactions.length === 0 ? 'not-allowed' : 'pointer',
                 outline: 'none',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 background: isGenerating || filteredTransactions.length === 0
                   ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  : 'linear-gradient(135deg, #f97316 0%, #dc2626 100%)',
                 color: '#ffffff',
                 boxShadow: isGenerating || filteredTransactions.length === 0
                   ? '0 8px 25px rgba(156, 163, 175, 0.3)'
-                  : '0 20px 40px rgba(102, 126, 234, 0.4)',
-                transform: isGenerating || filteredTransactions.length === 0 ? 'translateY(0)' : 'translateY(-2px)'
+                  : '0 20px 40px rgba(249, 115, 22, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                transform: isGenerating || filteredTransactions.length === 0 ? 'translateY(0)' : 'translateY(-2px)',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)'
               }}
               onMouseEnter={(e) => {
                 if (!isGenerating && filteredTransactions.length > 0) {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #ea580c 0%, #b91c1c 100%)';
                   e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 25px 50px rgba(102, 126, 234, 0.5)';
+                  e.currentTarget.style.boxShadow = '0 25px 50px rgba(249, 115, 22, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.border = '3px solid rgba(255, 255, 255, 0.3)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isGenerating && filteredTransactions.length > 0) {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #f97316 0%, #dc2626 100%)';
                   e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(102, 126, 234, 0.4)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(249, 115, 22, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.border = '3px solid rgba(255, 255, 255, 0.2)';
                 }
               }}
             >
