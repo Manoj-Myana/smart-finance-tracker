@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Wallet, LogOut, CreditCard } from 'lucide-react';
+import { Wallet, LogOut, CreditCard, MoreVertical, MessageCircle, Bell, Download, Flame } from 'lucide-react';
 
 interface NavbarProps {
   isHomePage?: boolean;
@@ -9,8 +9,40 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+      // Close dropdown on scroll
+      setIsDropdownOpen(false);
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+        }
+        setIsDropdownOpen(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Check if user is logged in
@@ -31,6 +63,19 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
       setUserName('');
     }
   }, [location]);
+
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setIsDropdownOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsDropdownOpen(false);
+    }, 200); // 200ms delay before closing
+  };
 
   const handleLogout = async () => {
     try {
@@ -59,7 +104,10 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
   if (isHomePage) {
     // Home page navbar: Logo left, Login/Signup right
     return (
-      <nav className="bg-gradient-to-r from-slate-100 via-blue-100 to-indigo-200 shadow-2xl border-b border-white/30 backdrop-blur-sm">
+      <nav 
+        className="bg-gradient-to-r from-slate-100 via-blue-100 to-indigo-200 shadow-2xl border-b border-white/30 backdrop-blur-sm"
+        style={{ position: 'relative', zIndex: 1000 }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -120,7 +168,27 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
   ];
 
   return (
-    <nav className="bg-gradient-to-r from-slate-100 via-blue-100 to-indigo-200 shadow-2xl border-b border-white/30 backdrop-blur-sm">
+    <>
+      {/* CSS Animation Styles */}
+      <style>
+        {`
+          @keyframes dropdownFadeIn {
+            0% {
+              opacity: 0;
+              transform: translateY(-10px) scale(0.95);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+        `}
+      </style>
+      
+      <nav 
+        className="bg-gradient-to-r from-slate-100 via-blue-100 to-indigo-200 shadow-2xl border-b border-white/30 backdrop-blur-sm"
+        style={{ position: 'relative', zIndex: 1000 }}
+      >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
@@ -153,6 +221,195 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
               );
             })}
             
+            {/* Three-dot menu with dropdown */}
+            {isLoggedIn && (
+              <>
+                {/* Backdrop overlay when dropdown is open */}
+                {isDropdownOpen && (
+                  <div 
+                    className="fixed inset-0"
+                    style={{ 
+                      zIndex: 9998,
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%)',
+                      backdropFilter: 'blur(2px)'
+                    }}
+                    onClick={() => {
+                      if (hoverTimeoutRef.current) {
+                        clearTimeout(hoverTimeoutRef.current);
+                      }
+                      setIsDropdownOpen(false);
+                    }}
+                  />
+                )}
+                
+                <div 
+                  className="relative"
+                  ref={dropdownRef}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <button
+                    className="flex items-center justify-center w-10 h-10 rounded-xl transition-all hover:scale-105 transform"
+                    style={{ 
+                      cursor: 'pointer',
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)',
+                      color: '#4f46e5',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)';
+                      e.currentTarget.style.color = '#3730a3';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)';
+                      e.currentTarget.style.color = '#4f46e5';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+                    }}
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                  
+                  {/* Invisible bridge to prevent dropdown from closing */}
+                  {isDropdownOpen && (
+                    <div 
+                      className="absolute right-0 top-10 w-48 h-4"
+                      style={{ 
+                        zIndex: 9998,
+                        background: 'linear-gradient(to bottom, rgba(59, 130, 246, 0.02) 0%, transparent 100%)'
+                      }}
+                    />
+                  )}
+                  
+                  {/* Dropdown Menu */}
+                  {isDropdownOpen && (
+                    <div 
+                      className="absolute right-0 top-12 w-48 rounded-xl shadow-2xl"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 50%, rgba(239,246,255,0.95) 100%)',
+                        boxShadow: '0 25px 50px -12px rgba(59, 130, 246, 0.25), 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        zIndex: 9999,
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        backdropFilter: 'blur(16px)',
+                        animation: 'dropdownFadeIn 0.2s ease-out forwards',
+                        transformOrigin: 'top right'
+                      }}
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <div style={{ paddingTop: '16px', paddingBottom: '16px' }}>
+                        <Link
+                          to="/chatbot"
+                          className="flex items-center px-4 py-3 mx-2 mb-2 transition-all no-underline rounded-xl"
+                          style={{
+                            color: '#374151',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)';
+                            e.currentTarget.style.color = '#1e40af';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#374151';
+                            e.currentTarget.style.transform = 'translateX(0)';
+                          }}
+                          onClick={() => {
+                            if (hoverTimeoutRef.current) {
+                              clearTimeout(hoverTimeoutRef.current);
+                            }
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-3" style={{ color: '#3b82f6' }} />
+                          <span className="font-medium">Chatbot</span>
+                        </Link>
+                        <Link
+                          to="/notifications"
+                          className="flex items-center px-4 py-3 mx-2 mb-2 transition-all no-underline rounded-xl"
+                          style={{
+                            color: '#374151'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)';
+                            e.currentTarget.style.color = '#1e40af';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#374151';
+                            e.currentTarget.style.transform = 'translateX(0)';
+                          }}
+                          onClick={() => {
+                            if (hoverTimeoutRef.current) {
+                              clearTimeout(hoverTimeoutRef.current);
+                            }
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <Bell className="h-4 w-4 mr-3" style={{ color: '#8b5cf6' }} />
+                          <span className="font-medium">Notifications</span>
+                        </Link>
+                        <Link
+                          to="/streak"
+                          className="flex items-center px-4 py-3 mx-2 mb-2 transition-all no-underline rounded-xl"
+                          style={{
+                            color: '#374151'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)';
+                            e.currentTarget.style.color = '#1e40af';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#374151';
+                            e.currentTarget.style.transform = 'translateX(0)';
+                          }}
+                          onClick={() => {
+                            if (hoverTimeoutRef.current) {
+                              clearTimeout(hoverTimeoutRef.current);
+                            }
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <Flame className="h-4 w-4 mr-3" style={{ color: '#f97316' }} />
+                          <span className="font-medium">Streak</span>
+                        </Link>
+                        <Link
+                          to="/download-report"
+                          className="flex items-center px-4 py-3 mx-2 transition-all no-underline rounded-xl"
+                          style={{
+                            color: '#374151',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)';
+                            e.currentTarget.style.color = '#1e40af';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#374151';
+                            e.currentTarget.style.transform = 'translateX(0)';
+                          }}
+                          onClick={() => {
+                            if (hoverTimeoutRef.current) {
+                              clearTimeout(hoverTimeoutRef.current);
+                            }
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <Download className="h-4 w-4 mr-3" style={{ color: '#10b981' }} />
+                          <span className="font-medium">Download Report</span>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+            
             {/* Logout button for authenticated users */}
             {isLoggedIn && (
               <button
@@ -168,6 +425,7 @@ const Navbar: React.FC<NavbarProps> = ({ isHomePage = false }) => {
         </div>
       </div>
     </nav>
+    </>
   );
 };
 

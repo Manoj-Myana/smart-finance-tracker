@@ -15,6 +15,10 @@ import Reports from "./pages/Reports";
 import Predict from "./pages/Predict";
 import Goals from "./pages/Goals";
 import AiSuggestions from "./pages/AiSuggestions";
+import Chatbot from "./pages/Chatbot";
+import Notifications from "./pages/Notifications";
+import Streak from "./pages/Streak";
+import DownloadReport from "./pages/DownloadReport";
 
 function AppContent() {
   const location = useLocation();
@@ -36,6 +40,10 @@ function AppContent() {
         <Route path="/predict" element={<Layout><Predict /></Layout>} />
         <Route path="/goals" element={<Layout><Goals /></Layout>} />
         <Route path="/ai-suggestions" element={<Layout><AiSuggestions /></Layout>} />
+        <Route path="/chatbot" element={<Layout><Chatbot /></Layout>} />
+        <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
+        <Route path="/streak" element={<Layout><Streak /></Layout>} />
+        <Route path="/download-report" element={<Layout><DownloadReport /></Layout>} />
       </Routes>
     </div>
   );
