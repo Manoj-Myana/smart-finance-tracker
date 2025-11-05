@@ -554,84 +554,229 @@ const DownloadReport: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading transaction data...</p>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            border: '4px solid rgba(255, 255, 255, 0.3)',
+            borderTop: '4px solid #ffffff',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }}></div>
+          <p style={{
+            color: '#ffffff',
+            fontSize: '18px',
+            fontWeight: '500',
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          }}>Loading transaction data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '24px',
+      fontFamily: '"Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-3 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg">
-              <Download className="h-8 w-8 text-white" />
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '24px'
+          }}>
+            <div style={{
+              padding: '20px',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)',
+              borderRadius: '20px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '2px solid rgba(255,255,255,0.2)'
+            }}>
+              <Download style={{ height: '40px', width: '40px', color: '#667eea' }} />
             </div>
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 style={{
+            fontSize: '48px',
+            fontWeight: '800',
+            background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            marginBottom: '12px',
+            textShadow: '0 4px 8px rgba(0,0,0,0.1)'
+          }}>
             Download Reports
           </h1>
-          <p className="text-gray-600 mt-2">
-            Generate and download comprehensive financial reports
+          <p style={{
+            color: '#e2e8f0',
+            fontSize: '20px',
+            fontWeight: '400',
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          }}>
+            Generate and download comprehensive financial reports with advanced filtering
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: window.innerWidth >= 1024 ? '2fr 1fr' : '1fr',
+          gap: '32px'
+        }}>
           {/* Configuration Panel */}
-          <div className="lg:col-span-2 space-y-6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* Report Type Selection */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <FileText style={{ height: '24px', width: '24px', marginRight: '12px', color: '#667eea' }} />
                 Report Type
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth >= 768 ? 'repeat(2, 1fr)' : '1fr',
+                gap: '20px'
+              }}>
                 {reportTypes.map((report) => (
                   <button
                     key={report.type}
                     onClick={() => updateConfig({ type: report.type })}
-                    className={`text-left p-4 rounded-xl border-2 transition-all hover:scale-105 ${
-                      config.type === report.type
-                        ? 'border-blue-500 bg-blue-50 shadow-lg'
-                        : 'border-gray-200 bg-white/50 hover:border-gray-300'
-                    }`}
+                    style={{
+                      textAlign: 'left',
+                      padding: '24px',
+                      borderRadius: '16px',
+                      border: config.type === report.type 
+                        ? '3px solid #667eea' 
+                        : '2px solid rgba(226, 232, 240, 0.8)',
+                      background: config.type === report.type
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                        : 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transform: config.type === report.type ? 'translateY(-4px)' : 'translateY(0)',
+                      boxShadow: config.type === report.type
+                        ? '0 20px 40px rgba(102, 126, 234, 0.4)'
+                        : '0 8px 25px rgba(0,0,0,0.1)',
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (config.type !== report.type) {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 12px 30px rgba(0,0,0,0.15)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (config.type !== report.type) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+                      }
+                    }}
                   >
-                    <div className="flex items-center mb-2">
-                      <div className={`p-2 rounded-lg mr-3 ${
-                        config.type === report.type
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{
+                        padding: '12px',
+                        borderRadius: '12px',
+                        marginRight: '16px',
+                        background: config.type === report.type
+                          ? 'rgba(255, 255, 255, 0.2)'
+                          : 'rgba(102, 126, 234, 0.1)',
+                        color: config.type === report.type ? '#ffffff' : '#667eea'
+                      }}>
                         {report.icon}
                       </div>
-                      <h4 className="font-semibold text-gray-800">{report.title}</h4>
+                      <h4 style={{
+                        fontWeight: '700',
+                        fontSize: '18px',
+                        color: config.type === report.type ? '#ffffff' : '#1a202c'
+                      }}>{report.title}</h4>
                     </div>
-                    <p className="text-sm text-gray-600">{report.description}</p>
+                    <p style={{
+                      fontSize: '14px',
+                      color: config.type === report.type ? 'rgba(255, 255, 255, 0.9)' : '#64748b',
+                      lineHeight: '1.6'
+                    }}>{report.description}</p>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Format Selection */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <Download className="h-5 w-5 mr-2" />
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <Download style={{ height: '24px', width: '24px', marginRight: '12px', color: '#667eea' }} />
                 Export Format
               </h3>
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {formatOptions.map((format) => (
                   <label
                     key={format.value}
-                    className={`flex items-center p-3 rounded-xl border cursor-pointer transition-all hover:bg-gray-50 ${
-                      config.format === format.value
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200'
-                    }`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '20px',
+                      borderRadius: '16px',
+                      border: config.format === format.value
+                        ? '3px solid #667eea'
+                        : '2px solid rgba(226, 232, 240, 0.6)',
+                      background: config.format === format.value
+                        ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
+                        : 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transform: config.format === format.value ? 'translateX(8px)' : 'translateX(0)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (config.format !== format.value) {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (config.format !== format.value) {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }
+                    }}
                   >
                     <input
                       type="radio"
@@ -639,20 +784,42 @@ const DownloadReport: React.FC = () => {
                       value={format.value}
                       checked={config.format === format.value}
                       onChange={(e) => updateConfig({ format: e.target.value as any })}
-                      className="sr-only"
+                      style={{ display: 'none' }}
                     />
-                    <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${
-                      config.format === format.value
-                        ? 'border-blue-500 bg-blue-500'
-                        : 'border-gray-400'
-                    }`}>
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      border: '3px solid',
+                      borderColor: config.format === format.value ? '#667eea' : '#cbd5e0',
+                      marginRight: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: config.format === format.value ? '#667eea' : 'transparent',
+                      transition: 'all 0.3s ease'
+                    }}>
                       {config.format === format.value && (
-                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#ffffff'
+                        }}></div>
                       )}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-800">{format.label}</div>
-                      <div className="text-sm text-gray-600">{format.description}</div>
+                      <div style={{
+                        fontWeight: '600',
+                        fontSize: '18px',
+                        color: config.format === format.value ? '#667eea' : '#1a202c',
+                        marginBottom: '4px'
+                      }}>{format.label}</div>
+                      <div style={{
+                        fontSize: '14px',
+                        color: '#64748b',
+                        lineHeight: '1.5'
+                      }}>{format.description}</div>
                     </div>
                   </label>
                 ))}
@@ -660,22 +827,65 @@ const DownloadReport: React.FC = () => {
             </div>
 
             {/* Date Range Selection */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <Calendar style={{ height: '24px', width: '24px', marginRight: '12px', color: '#667eea' }} />
                 Date Range
               </h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: window.innerWidth >= 768 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+                  gap: '12px'
+                }}>
                   {dateRangeOptions.map((option) => (
                     <button
                       key={option.value}
                       onClick={() => updateConfig({ dateRange: option.value })}
-                      className={`px-4 py-2 rounded-xl font-semibold transition-all ${
-                        config.dateRange === option.value
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                      style={{
+                        padding: '16px 20px',
+                        borderRadius: '16px',
+                        fontWeight: '600',
+                        fontSize: '16px',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        background: config.dateRange === option.value
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                        color: config.dateRange === option.value ? '#ffffff' : '#1a202c',
+                        boxShadow: config.dateRange === option.value
+                          ? '0 8px 25px rgba(102, 126, 234, 0.4)'
+                          : '0 4px 15px rgba(0,0,0,0.1)',
+                        transform: config.dateRange === option.value ? 'translateY(-2px)' : 'translateY(0)'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (config.dateRange !== option.value) {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (config.dateRange !== option.value) {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }
+                      }}
                     >
                       {option.label}
                     </button>
@@ -683,27 +893,84 @@ const DownloadReport: React.FC = () => {
                 </div>
 
                 {config.dateRange === 'custom' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: window.innerWidth >= 768 ? 'repeat(2, 1fr)' : '1fr',
+                    gap: '20px',
+                    marginTop: '20px',
+                    padding: '24px',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                    borderRadius: '16px',
+                    border: '2px dashed rgba(102, 126, 234, 0.3)'
+                  }}>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label style={{
+                        display: 'block',
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1a202c',
+                        marginBottom: '12px'
+                      }}>
                         Start Date
                       </label>
                       <input
                         type="date"
                         value={config.startDate}
                         onChange={(e) => updateConfig({ startDate: e.target.value })}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style={{
+                          width: '100%',
+                          border: '2px solid rgba(226, 232, 240, 0.8)',
+                          borderRadius: '12px',
+                          padding: '14px 16px',
+                          fontSize: '16px',
+                          outline: 'none',
+                          transition: 'all 0.3s ease',
+                          background: '#ffffff',
+                          color: '#1a202c'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#667eea';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label style={{
+                        display: 'block',
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1a202c',
+                        marginBottom: '12px'
+                      }}>
                         End Date
                       </label>
                       <input
                         type="date"
                         value={config.endDate}
                         onChange={(e) => updateConfig({ endDate: e.target.value })}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style={{
+                          width: '100%',
+                          border: '2px solid rgba(226, 232, 240, 0.8)',
+                          borderRadius: '12px',
+                          padding: '14px 16px',
+                          fontSize: '16px',
+                          outline: 'none',
+                          transition: 'all 0.3s ease',
+                          background: '#ffffff',
+                          color: '#1a202c'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#667eea';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
                       />
                     </div>
                   </div>
@@ -711,20 +978,40 @@ const DownloadReport: React.FC = () => {
               </div>
             </div>
 
-            {/* Additional Options */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <Filter className="h-5 w-5 mr-2" />
+            {/* Transaction Filters */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <Filter style={{ height: '24px', width: '24px', marginRight: '12px', color: '#667eea' }} />
                 Transaction Filters
               </h3>
               
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
                 {/* Transaction Type Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label style={{
+                    display: 'block',
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    color: '#1a202c',
+                    marginBottom: '16px'
+                  }}>
                     Transaction Type
                   </label>
-                  <div className="flex space-x-2">
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                     {[
                       { value: 'all', label: 'All' },
                       { value: 'credit', label: 'Credit' },
@@ -733,11 +1020,36 @@ const DownloadReport: React.FC = () => {
                       <button
                         key={option.value}
                         onClick={() => updateConfig({ transactionType: option.value as any })}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                          config.transactionType === option.value
-                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                        style={{
+                          padding: '12px 24px',
+                          borderRadius: '16px',
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          border: 'none',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          background: config.transactionType === option.value
+                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                            : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                          color: config.transactionType === option.value ? '#ffffff' : '#1a202c',
+                          boxShadow: config.transactionType === option.value
+                            ? '0 8px 25px rgba(102, 126, 234, 0.4)'
+                            : '0 4px 15px rgba(0,0,0,0.08)',
+                          transform: config.transactionType === option.value ? 'translateY(-2px)' : 'translateY(0)'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (config.transactionType !== option.value) {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (config.transactionType !== option.value) {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }
+                        }}
                       >
                         {option.label}
                       </button>
@@ -747,10 +1059,16 @@ const DownloadReport: React.FC = () => {
 
                 {/* Frequency Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label style={{
+                    display: 'block',
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    color: '#1a202c',
+                    marginBottom: '16px'
+                  }}>
                     Frequency
                   </label>
-                  <div className="flex space-x-2">
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                     {[
                       { value: 'all', label: 'All' },
                       { value: 'regular', label: 'Regular' },
@@ -759,11 +1077,36 @@ const DownloadReport: React.FC = () => {
                       <button
                         key={option.value}
                         onClick={() => updateConfig({ frequency: option.value as any })}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                          config.frequency === option.value
-                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                        style={{
+                          padding: '12px 24px',
+                          borderRadius: '16px',
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          border: 'none',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          background: config.frequency === option.value
+                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                            : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                          color: config.frequency === option.value ? '#ffffff' : '#1a202c',
+                          boxShadow: config.frequency === option.value
+                            ? '0 8px 25px rgba(102, 126, 234, 0.4)'
+                            : '0 4px 15px rgba(0,0,0,0.08)',
+                          transform: config.frequency === option.value ? 'translateY(-2px)' : 'translateY(0)'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (config.frequency !== option.value) {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (config.frequency !== option.value) {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }
+                        }}
                       >
                         {option.label}
                       </button>
@@ -773,52 +1116,161 @@ const DownloadReport: React.FC = () => {
 
                 {/* Search Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label style={{
+                    display: 'block',
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    color: '#1a202c',
+                    marginBottom: '16px'
+                  }}>
                     Search Description
                   </label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <div style={{ position: 'relative' }}>
+                    <Search style={{
+                      position: 'absolute',
+                      left: '16px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      height: '20px',
+                      width: '20px',
+                      color: '#9ca3af'
+                    }} />
                     <input
                       type="text"
                       value={config.searchTerm}
                       onChange={(e) => updateConfig({ searchTerm: e.target.value })}
                       placeholder="Search transaction descriptions..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      style={{
+                        width: '100%',
+                        paddingLeft: '50px',
+                        paddingRight: '20px',
+                        paddingTop: '16px',
+                        paddingBottom: '16px',
+                        border: '2px solid rgba(226, 232, 240, 0.8)',
+                        borderRadius: '16px',
+                        fontSize: '16px',
+                        outline: 'none',
+                        transition: 'all 0.3s ease',
+                        background: '#ffffff',
+                        color: '#1a202c'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#667eea';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
                     />
                   </div>
                 </div>
 
                 {/* Amount Range Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label style={{
+                    display: 'block',
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    color: '#1a202c',
+                    marginBottom: '16px'
+                  }}>
                     Amount Range
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
-                      <IndianRupee className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '16px'
+                  }}>
+                    <div style={{ position: 'relative' }}>
+                      <IndianRupee style={{
+                        position: 'absolute',
+                        left: '16px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        height: '20px',
+                        width: '20px',
+                        color: '#9ca3af'
+                      }} />
                       <input
                         type="number"
                         value={config.amountMin}
                         onChange={(e) => updateConfig({ amountMin: e.target.value })}
                         placeholder="Min amount"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style={{
+                          width: '100%',
+                          paddingLeft: '50px',
+                          paddingRight: '20px',
+                          paddingTop: '16px',
+                          paddingBottom: '16px',
+                          border: '2px solid rgba(226, 232, 240, 0.8)',
+                          borderRadius: '16px',
+                          fontSize: '16px',
+                          outline: 'none',
+                          transition: 'all 0.3s ease',
+                          background: '#ffffff',
+                          color: '#1a202c'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#667eea';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
                       />
                     </div>
-                    <div className="relative">
-                      <IndianRupee className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <div style={{ position: 'relative' }}>
+                      <IndianRupee style={{
+                        position: 'absolute',
+                        left: '16px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        height: '20px',
+                        width: '20px',
+                        color: '#9ca3af'
+                      }} />
                       <input
                         type="number"
                         value={config.amountMax}
                         onChange={(e) => updateConfig({ amountMax: e.target.value })}
                         placeholder="Max amount"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style={{
+                          width: '100%',
+                          paddingLeft: '50px',
+                          paddingRight: '20px',
+                          paddingTop: '16px',
+                          paddingBottom: '16px',
+                          border: '2px solid rgba(226, 232, 240, 0.8)',
+                          borderRadius: '16px',
+                          fontSize: '16px',
+                          outline: 'none',
+                          transition: 'all 0.3s ease',
+                          background: '#ffffff',
+                          color: '#1a202c'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#667eea';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Filter Actions */}
-                <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  paddingTop: '24px',
+                  borderTop: '2px solid rgba(226, 232, 240, 0.6)'
+                }}>
                   <button
                     onClick={() => setConfig(prev => ({
                       ...prev,
@@ -828,89 +1280,222 @@ const DownloadReport: React.FC = () => {
                       amountMin: '',
                       amountMax: ''
                     }))}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all text-sm"
+                    style={{
+                      padding: '12px 20px',
+                      background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                      color: '#1a202c',
+                      borderRadius: '12px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      transition: 'all 0.3s ease',
+                      outline: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+                    }}
                   >
                     Reset Filters
                   </button>
-                  <div className="text-sm text-gray-500 flex items-center">
+                  <div style={{
+                    fontSize: '16px',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontWeight: '500'
+                  }}>
                     {filteredTransactions.length} of {transactions.length} transactions
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Chart Options */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <Filter className="h-5 w-5 mr-2" />
+            {/* Report Options */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <Filter style={{ height: '24px', width: '24px', marginRight: '12px', color: '#667eea' }} />
                 Report Options
               </h3>
-              <label className="flex items-center cursor-pointer">
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                padding: '20px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                border: '2px solid rgba(102, 126, 234, 0.1)',
+                transition: 'all 0.3s ease'
+              }}>
                 <input
                   type="checkbox"
                   checked={config.includeCharts}
                   onChange={(e) => updateConfig({ includeCharts: e.target.checked })}
-                  className="sr-only"
+                  style={{ display: 'none' }}
                 />
-                <div className={`w-5 h-5 rounded border-2 mr-3 flex items-center justify-center ${
-                  config.includeCharts
-                    ? 'border-blue-500 bg-blue-500'
-                    : 'border-gray-400'
-                }`}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  border: '3px solid',
+                  borderColor: config.includeCharts ? '#667eea' : '#cbd5e0',
+                  marginRight: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: config.includeCharts ? '#667eea' : 'transparent',
+                  transition: 'all 0.3s ease'
+                }}>
                   {config.includeCharts && (
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <svg style={{ width: '14px', height: '14px', color: '#ffffff' }} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   )}
                 </div>
                 <div>
-                  <div className="font-medium text-gray-800">Include Charts and Graphs</div>
-                  <div className="text-sm text-gray-600">Add visual representations to your report</div>
+                  <div style={{
+                    fontWeight: '600',
+                    fontSize: '18px',
+                    color: '#1a202c',
+                    marginBottom: '4px'
+                  }}>Include Charts and Graphs</div>
+                  <div style={{
+                    fontSize: '14px',
+                    color: '#64748b',
+                    lineHeight: '1.5'
+                  }}>Add visual representations to your report</div>
                 </div>
               </label>
             </div>
           </div>
 
           {/* Summary Panel */}
-          <div className="space-y-6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* Report Preview */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Report Preview</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Type:</span>
-                  <span className="font-medium">{reportTypes.find(r => r.type === config.type)?.title}</span>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px'
+              }}>Report Preview</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Type:</span>
+                  <span style={{ fontWeight: '600', fontSize: '16px', color: '#1a202c' }}>{reportTypes.find(r => r.type === config.type)?.title}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Format:</span>
-                  <span className="font-medium">{config.format.toUpperCase()}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Format:</span>
+                  <span style={{ fontWeight: '600', fontSize: '16px', color: '#1a202c' }}>{config.format.toUpperCase()}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Period:</span>
-                  <span className="font-medium">
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Period:</span>
+                  <span style={{ fontWeight: '600', fontSize: '16px', color: '#1a202c' }}>
                     {dateRangeOptions.find(d => d.value === config.dateRange)?.label}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Charts:</span>
-                  <span className="font-medium">{config.includeCharts ? 'Included' : 'Excluded'}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Charts:</span>
+                  <span style={{ fontWeight: '600', fontSize: '16px', color: '#1a202c' }}>{config.includeCharts ? 'Included' : 'Excluded'}</span>
                 </div>
-                <hr className="my-3" />
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Transactions:</span>
-                  <span className="font-medium">{filteredTransactions.length}</span>
+                <div style={{
+                  height: '2px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  margin: '20px 0',
+                  borderRadius: '1px'
+                }}></div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Transactions:</span>
+                  <span style={{ fontWeight: '700', fontSize: '18px', color: '#667eea' }}>{filteredTransactions.length}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Credit:</span>
-                  <span className="font-medium text-green-600">{formatCurrency(totalCredit)}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Total Credit:</span>
+                  <span style={{ fontWeight: '700', fontSize: '18px', color: '#10b981' }}>{formatCurrency(totalCredit)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Debit:</span>
-                  <span className="font-medium text-red-600">{formatCurrency(totalDebit)}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Total Debit:</span>
+                  <span style={{ fontWeight: '700', fontSize: '18px', color: '#ef4444' }}>{formatCurrency(totalDebit)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Net Balance:</span>
-                  <span className={`font-medium ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '16px 0',
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                  borderRadius: '12px',
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
+                  border: '2px solid rgba(102, 126, 234, 0.2)'
+                }}>
+                  <span style={{ color: '#1a202c', fontSize: '18px', fontWeight: '600' }}>Net Balance:</span>
+                  <span style={{
+                    fontWeight: '800',
+                    fontSize: '20px',
+                    color: balance >= 0 ? '#10b981' : '#ef4444'
+                  }}>
                     {formatCurrency(balance)}
                   </span>
                 </div>
@@ -921,58 +1506,177 @@ const DownloadReport: React.FC = () => {
             <button
               onClick={handleGenerate}
               disabled={isGenerating || filteredTransactions.length === 0}
-              className={`w-full py-4 rounded-xl font-semibold transition-all transform shadow-lg ${
-                isGenerating || filteredTransactions.length === 0
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105'
-              } text-white`}
+              style={{
+                width: '100%',
+                padding: '20px',
+                borderRadius: '20px',
+                fontWeight: '700',
+                fontSize: '18px',
+                border: 'none',
+                cursor: isGenerating || filteredTransactions.length === 0 ? 'not-allowed' : 'pointer',
+                outline: 'none',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                background: isGenerating || filteredTransactions.length === 0
+                  ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: '#ffffff',
+                boxShadow: isGenerating || filteredTransactions.length === 0
+                  ? '0 8px 25px rgba(156, 163, 175, 0.3)'
+                  : '0 20px 40px rgba(102, 126, 234, 0.4)',
+                transform: isGenerating || filteredTransactions.length === 0 ? 'translateY(0)' : 'translateY(-2px)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isGenerating && filteredTransactions.length > 0) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)';
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 25px 50px rgba(102, 126, 234, 0.5)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isGenerating && filteredTransactions.length > 0) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(102, 126, 234, 0.4)';
+                }
+              }}
             >
               {isGenerating ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    border: '3px solid rgba(255, 255, 255, 0.3)',
+                    borderTop: '3px solid #ffffff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    marginRight: '12px'
+                  }}></div>
                   Generating Report...
                 </div>
               ) : filteredTransactions.length === 0 ? (
-                <div className="flex items-center justify-center">
-                  <FileText className="h-5 w-5 mr-2" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText style={{ height: '24px', width: '24px', marginRight: '12px' }} />
                   No Data to Export
                 </div>
               ) : (
-                <div className="flex items-center justify-center">
-                  <Download className="h-5 w-5 mr-2" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Download style={{ height: '24px', width: '24px', marginRight: '12px' }} />
                   Generate & Download ({filteredTransactions.length} transactions)
                 </div>
               )}
             </button>
 
             {/* Quick Stats */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Filter Stats</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Filtered Transactions</span>
-                  <span className="font-semibold text-gray-800">{filteredTransactions.length}</span>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px'
+              }}>Current Filter Stats</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Filtered Transactions</span>
+                  <span style={{
+                    fontWeight: '700',
+                    fontSize: '18px',
+                    color: '#667eea',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                    padding: '6px 12px',
+                    borderRadius: '12px'
+                  }}>{filteredTransactions.length}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Credit Transactions</span>
-                  <span className="font-semibold text-green-600">{filteredTransactions.filter(t => t.type === 'credit').length}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Credit Transactions</span>
+                  <span style={{
+                    fontWeight: '700',
+                    fontSize: '18px',
+                    color: '#10b981',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    padding: '6px 12px',
+                    borderRadius: '12px'
+                  }}>{filteredTransactions.filter(t => t.type === 'credit').length}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Debit Transactions</span>
-                  <span className="font-semibold text-red-600">{filteredTransactions.filter(t => t.type === 'debit').length}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Debit Transactions</span>
+                  <span style={{
+                    fontWeight: '700',
+                    fontSize: '18px',
+                    color: '#ef4444',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    padding: '6px 12px',
+                    borderRadius: '12px'
+                  }}>{filteredTransactions.filter(t => t.type === 'debit').length}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Average Amount</span>
-                  <span className="font-semibold text-gray-800">{formatCurrency(averageTransaction)}</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '16px' }}>Average Amount</span>
+                  <span style={{
+                    fontWeight: '700',
+                    fontSize: '18px',
+                    color: '#1a202c',
+                    background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                    padding: '6px 12px',
+                    borderRadius: '12px'
+                  }}>{formatCurrency(averageTransaction)}</span>
                 </div>
                 {config.searchTerm && (
-                  <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-                    <span className="text-xs text-blue-600">Searching for: "{config.searchTerm}"</span>
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                    borderRadius: '16px',
+                    border: '2px solid rgba(102, 126, 234, 0.2)'
+                  }}>
+                    <span style={{
+                      fontSize: '14px',
+                      color: '#667eea',
+                      fontWeight: '600'
+                    }}>Searching for: "{config.searchTerm}"</span>
                   </div>
                 )}
                 {(config.amountMin || config.amountMax) && (
-                  <div className="mt-2 p-2 bg-green-50 rounded-lg">
-                    <span className="text-xs text-green-600">
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%)',
+                    borderRadius: '16px',
+                    border: '2px solid rgba(16, 185, 129, 0.2)'
+                  }}>
+                    <span style={{
+                      fontSize: '14px',
+                      color: '#10b981',
+                      fontWeight: '600'
+                    }}>
                       Amount: {config.amountMin || '0'} - {config.amountMax || '∞'}
                     </span>
                   </div>
@@ -981,33 +1685,134 @@ const DownloadReport: React.FC = () => {
             </div>
 
             {/* Recent Reports */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Reports</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '32px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#1a202c',
+                marginBottom: '24px'
+              }}>Recent Reports</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
                   <div>
-                    <div className="text-sm font-medium">Transaction Report</div>
-                    <div className="text-xs text-gray-500">Yesterday - 142 transactions</div>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#1a202c',
+                      marginBottom: '4px'
+                    }}>Transaction Report</div>
+                    <div style={{
+                      fontSize: '14px',
+                      color: '#64748b'
+                    }}>Yesterday - 142 transactions</div>
                   </div>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm">
+                  <button style={{
+                    color: '#667eea',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)';
+                  }}>
                     Download
                   </button>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px 0',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}>
                   <div>
-                    <div className="text-sm font-medium">Monthly Summary</div>
-                    <div className="text-xs text-gray-500">1 week ago - Full month</div>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#1a202c',
+                      marginBottom: '4px'
+                    }}>Monthly Summary</div>
+                    <div style={{
+                      fontSize: '14px',
+                      color: '#64748b'
+                    }}>1 week ago - Full month</div>
                   </div>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm">
+                  <button style={{
+                    color: '#667eea',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)';
+                  }}>
                     Download
                   </button>
                 </div>
-                <div className="flex items-center justify-between py-2">
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px 0'
+                }}>
                   <div>
-                    <div className="text-sm font-medium">Budget Analysis</div>
-                    <div className="text-xs text-gray-500">2 weeks ago - Q3 data</div>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#1a202c',
+                      marginBottom: '4px'
+                    }}>Budget Analysis</div>
+                    <div style={{
+                      fontSize: '14px',
+                      color: '#64748b'
+                    }}>2 weeks ago - Q3 data</div>
                   </div>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm">
+                  <button style={{
+                    color: '#667eea',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)';
+                  }}>
                     Download
                   </button>
                 </div>
@@ -1018,32 +1823,97 @@ const DownloadReport: React.FC = () => {
 
         {/* Transaction Preview */}
         {filteredTransactions.length > 0 && (
-          <div className="mt-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+          <div style={{
+            marginTop: '48px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '24px',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            padding: '32px'
+          }}>
+            <h3 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: '#1a202c',
+              marginBottom: '24px'
+            }}>
               Transaction Preview ({filteredTransactions.length} transactions)
             </h3>
-            <div className="max-h-64 overflow-y-auto">
-              <div className="space-y-2">
+            <div style={{
+              maxHeight: '400px',
+              overflowY: 'auto',
+              paddingRight: '8px'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {filteredTransactions.slice(0, 10).map((transaction, index) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800">{transaction.description}</div>
-                      <div className="text-sm text-gray-500">
+                  <div key={transaction.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '20px',
+                    background: 'linear-gradient(135deg, #f8f9ff 0%, #f1f5f9 100%)',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(226, 232, 240, 0.6)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #f8f9ff 0%, #f1f5f9 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontWeight: '600',
+                        fontSize: '16px',
+                        color: '#1a202c',
+                        marginBottom: '6px'
+                      }}>{transaction.description}</div>
+                      <div style={{
+                        fontSize: '14px',
+                        color: '#64748b'
+                      }}>
                         {new Date(transaction.date).toLocaleDateString()} • {transaction.frequency}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className={`font-semibold ${
-                        transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
-                      }`}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{
+                        fontWeight: '700',
+                        fontSize: '18px',
+                        color: transaction.type === 'credit' ? '#10b981' : '#ef4444',
+                        marginBottom: '4px'
+                      }}>
                         {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </div>
-                      <div className="text-xs text-gray-500 uppercase">{transaction.type}</div>
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        fontWeight: '600',
+                        background: transaction.type === 'credit' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        padding: '4px 8px',
+                        borderRadius: '8px',
+                        display: 'inline-block'
+                      }}>{transaction.type}</div>
                     </div>
                   </div>
                 ))}
                 {filteredTransactions.length > 10 && (
-                  <div className="text-center py-2 text-gray-500 text-sm">
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '20px',
+                    color: '#64748b',
+                    fontSize: '16px',
+                    fontWeight: '500',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                    borderRadius: '16px',
+                    border: '2px dashed rgba(102, 126, 234, 0.2)'
+                  }}>
                     ... and {filteredTransactions.length - 10} more transactions
                   </div>
                 )}
@@ -1053,15 +1923,50 @@ const DownloadReport: React.FC = () => {
         )}
 
         {filteredTransactions.length === 0 && !loading && (
-          <div className="mt-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-12 text-center">
-            <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">No Transactions Found</h3>
-            <p className="text-gray-500">
-              No transactions match your current filter criteria. Try adjusting your filters or date range.
+          <div style={{
+            marginTop: '48px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '24px',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            padding: '64px',
+            textAlign: 'center'
+          }}>
+            <FileText style={{
+              height: '80px',
+              width: '80px',
+              color: '#9ca3af',
+              margin: '0 auto 24px'
+            }} />
+            <h3 style={{
+              fontSize: '28px',
+              fontWeight: '700',
+              color: '#64748b',
+              marginBottom: '12px'
+            }}>No Transactions Found</h3>
+            <p style={{
+              fontSize: '18px',
+              color: '#64748b',
+              lineHeight: '1.6',
+              maxWidth: '500px',
+              margin: '0 auto'
+            }}>
+              No transactions match your current filter criteria. Try adjusting your filters or date range to see more results.
             </p>
           </div>
         )}
       </div>
+
+      {/* Add CSS animation for spin */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `
+      }} />
     </div>
   );
 };
