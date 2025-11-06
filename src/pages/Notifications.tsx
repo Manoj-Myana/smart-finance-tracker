@@ -1,84 +1,513 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle, AlertCircle, Info, X, Filter } from 'lucide-react';
+import { 
+  Bell, CheckCircle, AlertCircle, Info, X, Filter, Plus, Calendar, 
+  DollarSign, TrendingUp, Target, Clock, Edit, Trash2, Save, AlertTriangle,
+  PiggyBank, CreditCard, HandCoins, Wallet
+} from 'lucide-react';
+
+interface UserType {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
+interface Transaction {
+  id: number;
+  user_id: number;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  frequency: 'regular' | 'irregular';
+  created_at: string;
+}
 
 interface Notification {
-  id: number;
+  id: string;
   title: string;
   message: string;
   type: 'success' | 'warning' | 'info' | 'error';
   timestamp: Date;
   read: boolean;
+  category: 'system' | 'reminder' | 'budget' | 'savings';
+}
+
+interface Reminder {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  type: 'collect' | 'pay';
+  isCompleted: boolean;
+  createdAt: string;
+}
+
+interface BudgetLimit {
+  id: string;
+  amount: number;
+  month: string; // YYYY-MM format
+  currentSpent: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface SavingsTarget {
+  id: string;
+  targetAmount: number;
+  currentSaved: number;
+  month: string; // YYYY-MM format
+  isActive: boolean;
+  createdAt: string;
 }
 
 const Notifications: React.FC = () => {
+  const [user, setUser] = useState<UserType | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [budgetLimits, setBudgetLimits] = useState<BudgetLimit[]>([]);
+  const [savingsTargets, setSavingsTargets] = useState<SavingsTarget[]>([]);
+  
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [activeTab, setActiveTab] = useState<'notifications' | 'reminders' | 'budget' | 'savings'>('notifications');
+  
+  // Form states
+  const [showReminderForm, setShowReminderForm] = useState(false);
+  const [showBudgetForm, setShowBudgetForm] = useState(false);
+  const [showSavingsForm, setShowSavingsForm] = useState(false);
+  
+  const [reminderForm, setReminderForm] = useState({
+    description: '',
+    amount: '',
+    date: '',
+    type: 'pay' as 'collect' | 'pay'
+  });
+  
+  const [budgetForm, setBudgetForm] = useState({
+    amount: '',
+    month: new Date().toISOString().slice(0, 7) // Current month
+  });
+  
+  const [savingsForm, setSavingsForm] = useState({
+    targetAmount: '',
+    month: new Date().toISOString().slice(0, 7) // Current month
+  });
 
+  // Load user data and transactions
   useEffect(() => {
-    // Simulate loading notifications
-    const mockNotifications: Notification[] = [
-      {
-        id: 1,
-        title: 'Budget Alert',
-        message: 'You have exceeded 80% of your monthly grocery budget.',
-        type: 'warning',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        read: false
-      },
-      {
-        id: 2,
-        title: 'Transaction Added',
-        message: 'New transaction: Coffee Shop - $4.50',
-        type: 'info',
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-        read: false
-      },
-      {
-        id: 3,
-        title: 'Goal Achievement',
-        message: 'Congratulations! You\'ve reached your savings goal for this month.',
-        type: 'success',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        read: true
-      },
-      {
-        id: 4,
-        title: 'Payment Reminder',
-        message: 'Credit card payment due in 3 days.',
-        type: 'warning',
-        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        read: false
-      },
-      {
-        id: 5,
-        title: 'Weekly Summary',
-        message: 'Your weekly financial summary is ready to view.',
-        type: 'info',
-        timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        read: true
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        fetchTransactions(parsedUser.id);
+        loadUserData(parsedUser.id);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
       }
-    ];
-    setNotifications(mockNotifications);
+    }
   }, []);
 
-  const markAsRead = (id: number) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true }
-          : notification
-      )
+  const fetchTransactions = async (userId: number) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`http://localhost:5000/api/transactions/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTransactions(data);
+      } else {
+        console.error('Failed to fetch transactions');
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
+  };
+
+  const loadUserData = (userId: number) => {
+    try {
+      // Load reminders
+      const savedReminders = localStorage.getItem(`reminders_${userId}`);
+      if (savedReminders) {
+        setReminders(JSON.parse(savedReminders));
+      }
+
+      // Load budget limits
+      const savedBudgets = localStorage.getItem(`budgetLimits_${userId}`);
+      if (savedBudgets) {
+        setBudgetLimits(JSON.parse(savedBudgets));
+      }
+
+      // Load savings targets
+      const savedTargets = localStorage.getItem(`savingsTargets_${userId}`);
+      if (savedTargets) {
+        setSavingsTargets(JSON.parse(savedTargets));
+      }
+
+      // Load notifications
+      const savedNotifications = localStorage.getItem(`notifications_${userId}`);
+      if (savedNotifications) {
+        setNotifications(JSON.parse(savedNotifications).map((n: any) => ({
+          ...n,
+          timestamp: new Date(n.timestamp)
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  // Check for budget and savings alerts
+  useEffect(() => {
+    if (user && transactions.length > 0) {
+      checkBudgetAlerts();
+      checkSavingsProgress();
+      checkReminders();
+    }
+  }, [transactions, budgetLimits, savingsTargets, reminders, user]);
+
+  const checkBudgetAlerts = () => {
+    if (!user) return;
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const activeBudget = budgetLimits.find(b => b.isActive && b.month === currentMonth);
+    
+    if (activeBudget) {
+      // Calculate current month spending
+      const currentMonthSpending = transactions
+        .filter(t => 
+          t.type === 'debit' && 
+          t.date.startsWith(currentMonth)
+        )
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      // Update current spent
+      const updatedBudgets = budgetLimits.map(b =>
+        b.id === activeBudget.id ? { ...b, currentSpent: currentMonthSpending } : b
+      );
+      setBudgetLimits(updatedBudgets);
+      localStorage.setItem(`budgetLimits_${user.id}`, JSON.stringify(updatedBudgets));
+
+      const spentPercentage = (currentMonthSpending / activeBudget.amount) * 100;
+
+      // Check for 80% warning
+      if (spentPercentage >= 80 && spentPercentage < 100) {
+        const existingAlert = notifications.find(n => 
+          n.category === 'budget' && 
+          n.message.includes('80%') &&
+          n.timestamp.toDateString() === new Date().toDateString()
+        );
+
+        if (!existingAlert) {
+          addNotification({
+            title: 'Budget Alert - 80% Limit Reached',
+            message: `You've spent ${spentPercentage.toFixed(1)}% (₹${currentMonthSpending.toFixed(2)}) of your monthly budget (₹${activeBudget.amount}). Consider monitoring your expenses.`,
+            type: 'warning',
+            category: 'budget'
+          });
+        }
+      }
+
+      // Check for 100% warning
+      if (spentPercentage >= 100) {
+        const existingAlert = notifications.find(n => 
+          n.category === 'budget' && 
+          n.message.includes('exceeded') &&
+          n.timestamp.toDateString() === new Date().toDateString()
+        );
+
+        if (!existingAlert) {
+          addNotification({
+            title: 'Budget Limit Exceeded!',
+            message: `You've exceeded your monthly budget! Spent ₹${currentMonthSpending.toFixed(2)} out of ₹${activeBudget.amount} (${spentPercentage.toFixed(1)}%).`,
+            type: 'error',
+            category: 'budget'
+          });
+        }
+      }
+    }
+  };
+
+  const checkSavingsProgress = () => {
+    if (!user) return;
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const activeTarget = savingsTargets.find(t => t.isActive && t.month === currentMonth);
+    
+    if (activeTarget) {
+      // Calculate current month savings (credits - debits)
+      const currentMonthCredits = transactions
+        .filter(t => 
+          t.type === 'credit' && 
+          t.date.startsWith(currentMonth)
+        )
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const currentMonthDebits = transactions
+        .filter(t => 
+          t.type === 'debit' && 
+          t.date.startsWith(currentMonth)
+        )
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const currentSavings = Math.max(0, currentMonthCredits - currentMonthDebits);
+
+      // Update current saved
+      const updatedTargets = savingsTargets.map(t =>
+        t.id === activeTarget.id ? { ...t, currentSaved: currentSavings } : t
+      );
+      setSavingsTargets(updatedTargets);
+      localStorage.setItem(`savingsTargets_${user.id}`, JSON.stringify(updatedTargets));
+
+      const savedPercentage = (currentSavings / activeTarget.targetAmount) * 100;
+      const remainingAmount = activeTarget.targetAmount - currentSavings;
+
+      // Only send notification if there's meaningful progress
+      if (savedPercentage > 0) {
+        const existingUpdate = notifications.find(n => 
+          n.category === 'savings' && 
+          n.timestamp.toDateString() === new Date().toDateString()
+        );
+
+        if (!existingUpdate) {
+          addNotification({
+            title: 'Savings Progress Update',
+            message: `You've saved ${savedPercentage.toFixed(1)}% (₹${currentSavings.toFixed(2)}) of your target (₹${activeTarget.targetAmount}). ${remainingAmount > 0 ? `Still need to save ₹${remainingAmount.toFixed(2)} this month.` : 'Congratulations! Target achieved!'}`,
+            type: savedPercentage >= 100 ? 'success' : 'info',
+            category: 'savings'
+          });
+        }
+      }
+    }
+  };
+
+  const checkReminders = () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const upcomingReminders = reminders.filter(r => 
+      !r.isCompleted && 
+      r.date === today
     );
+
+    upcomingReminders.forEach(reminder => {
+      const existingReminder = notifications.find(n => 
+        n.category === 'reminder' && 
+        n.message.includes(reminder.description) &&
+        n.timestamp.toDateString() === new Date().toDateString()
+      );
+
+      if (!existingReminder) {
+        addNotification({
+          title: `Payment Reminder - ${reminder.type === 'collect' ? 'Collect Money' : 'Pay Money'}`,
+          message: `${reminder.description} - ₹${reminder.amount} is due today.`,
+          type: 'warning',
+          category: 'reminder'
+        });
+      }
+    });
+  };
+
+  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    if (!user) return;
+
+    const newNotification: Notification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date(),
+      read: false,
+      ...notification
+    };
+
+    const updatedNotifications = [newNotification, ...notifications].slice(0, 50); // Keep only latest 50
+    setNotifications(updatedNotifications);
+    localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
+  };
+
+  // Reminder functions
+  const handleAddReminder = () => {
+    if (!user || !reminderForm.description || !reminderForm.amount || !reminderForm.date) {
+      alert('Please fill all fields');
+      return;
+    }
+
+    const newReminder: Reminder = {
+      id: `reminder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      description: reminderForm.description,
+      amount: parseFloat(reminderForm.amount),
+      date: reminderForm.date,
+      type: reminderForm.type,
+      isCompleted: false,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedReminders = [...reminders, newReminder];
+    setReminders(updatedReminders);
+    localStorage.setItem(`reminders_${user.id}`, JSON.stringify(updatedReminders));
+
+    // Reset form
+    setReminderForm({
+      description: '',
+      amount: '',
+      date: '',
+      type: 'pay'
+    });
+    setShowReminderForm(false);
+
+    addNotification({
+      title: 'Reminder Added',
+      message: `Reminder for ${newReminder.description} (₹${newReminder.amount}) set for ${new Date(newReminder.date).toLocaleDateString()}.`,
+      type: 'success',
+      category: 'reminder'
+    });
+  };
+
+  const toggleReminderComplete = (id: string) => {
+    if (!user) return;
+
+    const updatedReminders = reminders.map(r =>
+      r.id === id ? { ...r, isCompleted: !r.isCompleted } : r
+    );
+    setReminders(updatedReminders);
+    localStorage.setItem(`reminders_${user.id}`, JSON.stringify(updatedReminders));
+
+    const reminder = reminders.find(r => r.id === id);
+    if (reminder) {
+      addNotification({
+        title: 'Reminder Updated',
+        message: `Reminder "${reminder.description}" marked as ${!reminder.isCompleted ? 'completed' : 'pending'}.`,
+        type: 'info',
+        category: 'reminder'
+      });
+    }
+  };
+
+  const deleteReminder = (id: string) => {
+    if (!user) return;
+
+    const updatedReminders = reminders.filter(r => r.id !== id);
+    setReminders(updatedReminders);
+    localStorage.setItem(`reminders_${user.id}`, JSON.stringify(updatedReminders));
+
+    addNotification({
+      title: 'Reminder Deleted',
+      message: 'Reminder has been deleted successfully.',
+      type: 'info',
+      category: 'reminder'
+    });
+  };
+
+  // Budget functions
+  const handleAddBudget = () => {
+    if (!user || !budgetForm.amount || !budgetForm.month) {
+      alert('Please fill all fields');
+      return;
+    }
+
+    // Deactivate existing budget for the same month
+    const updatedExistingBudgets = budgetLimits.map(b =>
+      b.month === budgetForm.month ? { ...b, isActive: false } : b
+    );
+
+    const newBudget: BudgetLimit = {
+      id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      amount: parseFloat(budgetForm.amount),
+      month: budgetForm.month,
+      currentSpent: 0,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedBudgets = [...updatedExistingBudgets, newBudget];
+    setBudgetLimits(updatedBudgets);
+    localStorage.setItem(`budgetLimits_${user.id}`, JSON.stringify(updatedBudgets));
+
+    // Reset form
+    setBudgetForm({
+      amount: '',
+      month: new Date().toISOString().slice(0, 7)
+    });
+    setShowBudgetForm(false);
+
+    addNotification({
+      title: 'Budget Limit Set',
+      message: `Monthly budget of ₹${newBudget.amount} set for ${new Date(newBudget.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}.`,
+      type: 'success',
+      category: 'budget'
+    });
+  };
+
+  // Savings functions
+  const handleAddSavingsTarget = () => {
+    if (!user || !savingsForm.targetAmount || !savingsForm.month) {
+      alert('Please fill all fields');
+      return;
+    }
+
+    // Deactivate existing target for the same month
+    const updatedExistingTargets = savingsTargets.map(t =>
+      t.month === savingsForm.month ? { ...t, isActive: false } : t
+    );
+
+    const newTarget: SavingsTarget = {
+      id: `target_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      targetAmount: parseFloat(savingsForm.targetAmount),
+      currentSaved: 0,
+      month: savingsForm.month,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedTargets = [...updatedExistingTargets, newTarget];
+    setSavingsTargets(updatedTargets);
+    localStorage.setItem(`savingsTargets_${user.id}`, JSON.stringify(updatedTargets));
+
+    // Reset form
+    setSavingsForm({
+      targetAmount: '',
+      month: new Date().toISOString().slice(0, 7)
+    });
+    setShowSavingsForm(false);
+
+    addNotification({
+      title: 'Savings Target Set',
+      message: `Savings target of ₹${newTarget.targetAmount} set for ${new Date(newTarget.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}.`,
+      type: 'success',
+      category: 'savings'
+    });
+  };
+
+  // Notification functions
+  const markAsRead = (id: string) => {
+    if (!user) return;
+
+    const updatedNotifications = notifications.map(notification => 
+      notification.id === id 
+        ? { ...notification, read: true }
+        : notification
+    );
+    setNotifications(updatedNotifications);
+    localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
   };
 
   const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    );
+    if (!user) return;
+
+    const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
+    setNotifications(updatedNotifications);
+    localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
   };
 
-  const deleteNotification = (id: number) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  const deleteNotification = (id: string) => {
+    if (!user) return;
+
+    const updatedNotifications = notifications.filter(notification => notification.id !== id);
+    setNotifications(updatedNotifications);
+    localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
   };
 
   const getFilteredNotifications = () => {
@@ -99,7 +528,7 @@ const Notifications: React.FC = () => {
       case 'warning':
         return <AlertCircle className="h-5 w-5 text-yellow-600" />;
       case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
+        return <AlertTriangle className="h-5 w-5 text-red-600" />;
       default:
         return <Info className="h-5 w-5 text-blue-600" />;
     }
@@ -118,142 +547,1036 @@ const Notifications: React.FC = () => {
     }
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
   const unreadCount = notifications.filter(n => !n.read).length;
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentBudget = budgetLimits.find(b => b.isActive && b.month === currentMonth);
+  const currentTarget = savingsTargets.find(t => t.isActive && t.month === currentMonth);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '24px',
+      fontFamily: '"Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-3 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg relative">
-              <Bell className="h-8 w-8 text-white" />
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '24px'
+          }}>
+            <div style={{
+              padding: '20px',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)',
+              borderRadius: '20px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '2px solid rgba(255,255,255,0.2)',
+              position: 'relative'
+            }}>
+              <Bell style={{ height: '40px', width: '40px', color: '#667eea' }} />
               {unreadCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                <span style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '-8px',
+                  background: '#ef4444',
+                  color: 'white',
+                  fontSize: '12px',
+                  borderRadius: '50%',
+                  height: '24px',
+                  width: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold'
+                }}>
                   {unreadCount}
                 </span>
               )}
             </div>
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Notifications
+          <h1 style={{
+            fontSize: '48px',
+            fontWeight: '800',
+            background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            marginBottom: '12px',
+            textShadow: '0 4px 8px rgba(0,0,0,0.1)'
+          }}>
+            Notifications & Reminders
           </h1>
-          <p className="text-gray-600 mt-2">
-            Stay updated with your financial activities and alerts
+          <p style={{
+            color: '#e2e8f0',
+            fontSize: '20px',
+            fontWeight: '400',
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          }}>
+            Stay on top of your finances with smart alerts and reminders
           </p>
         </div>
 
-        {/* Controls */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-6 mb-6">
-          <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-            {/* Filter Buttons */}
-            <div className="flex items-center space-x-2">
-              <Filter className="h-5 w-5 text-gray-600" />
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-all ${
-                  filter === 'all'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                All ({notifications.length})
-              </button>
-              <button
-                onClick={() => setFilter('unread')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-all ${
-                  filter === 'unread'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Unread ({unreadCount})
-              </button>
-              <button
-                onClick={() => setFilter('read')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-all ${
-                  filter === 'read'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Read ({notifications.length - unreadCount})
-              </button>
-            </div>
-
-            {/* Mark All Read Button */}
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white rounded-xl font-semibold transition-all hover:scale-105 transform shadow-lg"
-              >
-                Mark All as Read
-              </button>
-            )}
+        {/* Tab Navigation */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginBottom: '32px'
+        }}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '16px',
+            padding: '8px',
+            display: 'flex',
+            gap: '8px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
+          }}>
+            {[
+              { id: 'notifications' as const, label: 'Notifications', icon: Bell },
+              { id: 'reminders' as const, label: 'Reminders', icon: Clock },
+              { id: 'budget' as const, label: 'Budget', icon: Wallet },
+              { id: 'savings' as const, label: 'Savings', icon: PiggyBank }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: activeTab === tab.id 
+                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                      : 'transparent',
+                    color: activeTab === tab.id ? '#ffffff' : '#667eea',
+                    fontWeight: '600',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Icon style={{ height: '18px', width: '18px' }} />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
+        {/* Content based on active tab */}
+        {activeTab === 'notifications' && (
+          <div>
+            {/* Controls */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '24px',
+              marginBottom: '24px'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '16px'
+              }}>
+                {/* Filter Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Filter style={{ height: '20px', width: '20px', color: '#64748b' }} />
+                  {[
+                    { id: 'all', label: `All (${notifications.length})` },
+                    { id: 'unread', label: `Unread (${unreadCount})` },
+                    { id: 'read', label: `Read (${notifications.length - unreadCount})` }
+                  ].map((filterOption) => (
+                    <button
+                      key={filterOption.id}
+                      onClick={() => setFilter(filterOption.id as 'all' | 'unread' | 'read')}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: filter === filterOption.id
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : '#f1f5f9',
+                        color: filter === filterOption.id ? '#ffffff' : '#64748b',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      {filterOption.label}
+                    </button>
+                  ))}
+                </div>
 
-        {/* Notifications List */}
-        <div className="space-y-4">
-          {getFilteredNotifications().length === 0 ? (
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/30 p-12 text-center">
-              <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">No Notifications</h3>
-              <p className="text-gray-500">
-                {filter === 'unread' 
-                  ? "You're all caught up! No unread notifications."
-                  : filter === 'read'
-                  ? "No read notifications found."
-                  : "You don't have any notifications yet."
-                }
-              </p>
+                {/* Mark All Read Button */}
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: '#ffffff',
+                      borderRadius: '12px',
+                      border: 'none',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
             </div>
-          ) : (
-            getFilteredNotifications().map((notification) => (
-              <div
-                key={notification.id}
-                className={`bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-l-4 ${getNotificationStyle(notification.type)} p-6 transition-all hover:shadow-xl ${
-                  !notification.read ? 'ring-2 ring-blue-100' : ''
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-4 flex-1">
-                    {getNotificationIcon(notification.type)}
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-semibold text-gray-800">{notification.title}</h3>
-                        {!notification.read && (
-                          <span className="bg-blue-500 h-2 w-2 rounded-full"></span>
-                        )}
+
+            {/* Notifications List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {getFilteredNotifications().length === 0 ? (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(20px)',
+                  borderRadius: '24px',
+                  boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+                  padding: '48px',
+                  textAlign: 'center'
+                }}>
+                  <Bell style={{ height: '64px', width: '64px', color: '#cbd5e1', margin: '0 auto 24px' }} />
+                  <h3 style={{ fontSize: '24px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>
+                    No Notifications
+                  </h3>
+                  <p style={{ color: '#64748b', fontSize: '16px' }}>
+                    {filter === 'unread' 
+                      ? "You're all caught up! No unread notifications."
+                      : filter === 'read'
+                      ? "No read notifications found."
+                      : "You don't have any notifications yet."
+                    }
+                  </p>
+                </div>
+              ) : (
+                getFilteredNotifications().map((notification) => (
+                  <div
+                    key={notification.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(20px)',
+                      borderRadius: '24px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                      borderLeft: `4px solid ${notification.type === 'success' ? '#10b981' : notification.type === 'warning' ? '#f59e0b' : notification.type === 'error' ? '#ef4444' : '#3b82f6'}`,
+                      padding: '24px',
+                      transition: 'all 0.3s ease',
+                      border: !notification.read ? '2px solid rgba(59, 130, 246, 0.2)' : '1px solid rgba(226, 232, 240, 0.3)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1 }}>
+                        {getNotificationIcon(notification.type)}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a202c', margin: 0 }}>
+                              {notification.title}
+                            </h3>
+                            {!notification.read && (
+                              <span style={{
+                                background: '#3b82f6',
+                                height: '8px',
+                                width: '8px',
+                                borderRadius: '50%'
+                              }}></span>
+                            )}
+                          </div>
+                          <p style={{ color: '#64748b', fontSize: '16px', marginBottom: '12px', lineHeight: '1.5' }}>
+                            {notification.message}
+                          </p>
+                          <p style={{ fontSize: '14px', color: '#94a3b8' }}>
+                            {notification.timestamp.toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-gray-600 mb-2">{notification.message}</p>
-                      <p className="text-sm text-gray-500">
-                        {notification.timestamp.toLocaleString()}
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '16px' }}>
+                        {!notification.read && (
+                          <button
+                            onClick={() => markAsRead(notification.id)}
+                            style={{
+                              color: '#3b82f6',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Mark as Read
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteNotification(notification.id)}
+                          style={{
+                            color: '#64748b',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '6px',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+                        >
+                          <X style={{ height: '20px', width: '20px' }} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reminders Tab */}
+        {activeTab === 'reminders' && (
+          <div>
+            {/* Add Reminder Section */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+              padding: '32px',
+              marginBottom: '24px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1a202c', margin: 0 }}>
+                  Payment Reminders
+                </h2>
+                <button
+                  onClick={() => setShowReminderForm(!showReminderForm)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 20px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  <Plus style={{ height: '18px', width: '18px' }} />
+                  Add Reminder
+                </button>
+              </div>
+
+              {showReminderForm && (
+                <div style={{
+                  background: '#f8fafc',
+                  padding: '24px',
+                  borderRadius: '16px',
+                  marginBottom: '24px'
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Description
+                      </label>
+                      <input
+                        type="text"
+                        value={reminderForm.description}
+                        onChange={(e) => setReminderForm(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="e.g., Electric bill payment"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Amount
+                      </label>
+                      <input
+                        type="number"
+                        value={reminderForm.amount}
+                        onChange={(e) => setReminderForm(prev => ({ ...prev, amount: e.target.value }))}
+                        placeholder="0.00"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Date
+                      </label>
+                      <input
+                        type="date"
+                        value={reminderForm.date}
+                        onChange={(e) => setReminderForm(prev => ({ ...prev, date: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Type
+                      </label>
+                      <select
+                        value={reminderForm.type}
+                        onChange={(e) => setReminderForm(prev => ({ ...prev, type: e.target.value as 'collect' | 'pay' }))}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      >
+                        <option value="pay">Pay Money</option>
+                        <option value="collect">Collect Money</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      onClick={handleAddReminder}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 20px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Save style={{ height: '16px', width: '16px' }} />
+                      Save Reminder
+                    </button>
+                    <button
+                      onClick={() => setShowReminderForm(false)}
+                      style={{
+                        padding: '12px 20px',
+                        background: '#f3f4f6',
+                        color: '#374151',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Reminders List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {reminders.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
+                    <Clock style={{ height: '48px', width: '48px', color: '#cbd5e1', margin: '0 auto 16px' }} />
+                    <p style={{ fontSize: '16px', fontWeight: '600' }}>No reminders set</p>
+                    <p style={{ fontSize: '14px' }}>Add your first payment reminder to get started</p>
+                  </div>
+                ) : (
+                  reminders.map((reminder) => (
+                    <div
+                      key={reminder.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        background: reminder.isCompleted ? '#f0fdf4' : '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                        opacity: reminder.isCompleted ? 0.7 : 1
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                        <div style={{
+                          padding: '8px',
+                          background: reminder.type === 'collect' ? '#dcfce7' : '#fef3c7',
+                          borderRadius: '8px'
+                        }}>
+                          {reminder.type === 'collect' ? 
+                            <HandCoins style={{ height: '20px', width: '20px', color: '#16a34a' }} /> :
+                            <CreditCard style={{ height: '20px', width: '20px', color: '#ca8a04' }} />
+                          }
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            color: '#1a202c',
+                            margin: '0 0 4px 0',
+                            textDecoration: reminder.isCompleted ? 'line-through' : 'none'
+                          }}>
+                            {reminder.description}
+                          </h4>
+                          <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+                            {formatCurrency(reminder.amount)} • {new Date(reminder.date).toLocaleDateString()} • 
+                            <span style={{ 
+                              color: reminder.type === 'collect' ? '#16a34a' : '#ca8a04',
+                              fontWeight: '600',
+                              marginLeft: '4px'
+                            }}>
+                              {reminder.type === 'collect' ? 'Collect' : 'Pay'}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={() => toggleReminderComplete(reminder.id)}
+                          style={{
+                            padding: '8px 12px',
+                            background: reminder.isCompleted ? '#f59e0b' : '#10b981',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {reminder.isCompleted ? 'Undo' : 'Complete'}
+                        </button>
+                        <button
+                          onClick={() => deleteReminder(reminder.id)}
+                          style={{
+                            padding: '8px',
+                            background: 'transparent',
+                            color: '#64748b',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+                        >
+                          <Trash2 style={{ height: '16px', width: '16px' }} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Budget Tab */}
+        {activeTab === 'budget' && (
+          <div>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+              padding: '32px',
+              marginBottom: '24px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1a202c', margin: 0 }}>
+                  Budget Management
+                </h2>
+                <button
+                  onClick={() => setShowBudgetForm(!showBudgetForm)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 20px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus style={{ height: '18px', width: '18px' }} />
+                  Set Budget
+                </button>
+              </div>
+
+              {/* Current Budget Status */}
+              {currentBudget && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  padding: '24px',
+                  borderRadius: '16px',
+                  marginBottom: '24px',
+                  border: '1px solid #0ea5e9'
+                }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#0c4a6e', marginBottom: '16px' }}>
+                    Current Month Budget Status
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
+                    <div>
+                      <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>Budget Limit</p>
+                      <p style={{ fontSize: '20px', fontWeight: '700', color: '#0c4a6e', margin: 0 }}>
+                        {formatCurrency(currentBudget.amount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>Spent</p>
+                      <p style={{ fontSize: '20px', fontWeight: '700', color: '#dc2626', margin: 0 }}>
+                        {formatCurrency(currentBudget.currentSpent)}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>Remaining</p>
+                      <p style={{ fontSize: '20px', fontWeight: '700', color: '#059669', margin: 0 }}>
+                        {formatCurrency(Math.max(0, currentBudget.amount - currentBudget.currentSpent))}
                       </p>
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2 ml-4">
-                    {!notification.read && (
-                      <button
-                        onClick={() => markAsRead(notification.id)}
-                        className="text-blue-600 hover:text-blue-800 font-semibold text-sm transition-colors"
-                      >
-                        Mark as Read
-                      </button>
-                    )}
+                  {/* Progress Bar */}
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Progress</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>
+                        {((currentBudget.currentSpent / currentBudget.amount) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{
+                      background: '#e5e7eb',
+                      height: '8px',
+                      borderRadius: '4px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        background: (currentBudget.currentSpent / currentBudget.amount) >= 1 ? '#dc2626' :
+                                  (currentBudget.currentSpent / currentBudget.amount) >= 0.8 ? '#f59e0b' : '#059669',
+                        height: '100%',
+                        width: `${Math.min(100, (currentBudget.currentSpent / currentBudget.amount) * 100)}%`,
+                        transition: 'all 0.3s ease'
+                      }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showBudgetForm && (
+                <div style={{
+                  background: '#f8fafc',
+                  padding: '24px',
+                  borderRadius: '16px',
+                  marginBottom: '24px'
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Budget Amount
+                      </label>
+                      <input
+                        type="number"
+                        value={budgetForm.amount}
+                        onChange={(e) => setBudgetForm(prev => ({ ...prev, amount: e.target.value }))}
+                        placeholder="0.00"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Month
+                      </label>
+                      <input
+                        type="month"
+                        value={budgetForm.month}
+                        onChange={(e) => setBudgetForm(prev => ({ ...prev, month: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
                     <button
-                      onClick={() => deleteNotification(notification.id)}
-                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      onClick={handleAddBudget}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 20px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
                     >
-                      <X className="h-5 w-5" />
+                      <Save style={{ height: '16px', width: '16px' }} />
+                      Set Budget
+                    </button>
+                    <button
+                      onClick={() => setShowBudgetForm(false)}
+                      style={{
+                        padding: '12px 20px',
+                        background: '#f3f4f6',
+                        color: '#374151',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
                     </button>
                   </div>
                 </div>
+              )}
+
+              {/* Budget History */}
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a202c', marginBottom: '16px' }}>
+                  Budget History
+                </h3>
+                {budgetLimits.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
+                    <Wallet style={{ height: '48px', width: '48px', color: '#cbd5e1', margin: '0 auto 16px' }} />
+                    <p style={{ fontSize: '16px', fontWeight: '600' }}>No budget limits set</p>
+                    <p style={{ fontSize: '14px' }}>Set your first budget to track spending</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {budgetLimits.map((budget) => (
+                      <div
+                        key={budget.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          background: budget.isActive ? '#ecfdf5' : '#ffffff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '12px'
+                        }}
+                      >
+                        <div>
+                          <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1a202c', margin: '0 0 4px 0' }}>
+                            {new Date(budget.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                          </h4>
+                          <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+                            Limit: {formatCurrency(budget.amount)} • 
+                            Spent: {formatCurrency(budget.currentSpent)} • 
+                            <span style={{ 
+                              color: budget.isActive ? '#059669' : '#64748b',
+                              fontWeight: '600',
+                              marginLeft: '4px'
+                            }}>
+                              {budget.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </p>
+                        </div>
+                        <div style={{
+                          padding: '4px 12px',
+                          background: budget.currentSpent > budget.amount ? '#fef2f2' : '#f0fdf4',
+                          color: budget.currentSpent > budget.amount ? '#dc2626' : '#059669',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          {budget.currentSpent > budget.amount ? 'Over Budget' : 'Within Budget'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))
-          )}
-        </div>
+            </div>
+          </div>
+        )}
+
+        {/* Savings Tab */}
+        {activeTab === 'savings' && (
+          <div>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+              padding: '32px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1a202c', margin: 0 }}>
+                  Savings Targets
+                </h2>
+                <button
+                  onClick={() => setShowSavingsForm(!showSavingsForm)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 20px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus style={{ height: '18px', width: '18px' }} />
+                  Set Target
+                </button>
+              </div>
+
+              {/* Current Savings Status */}
+              {currentTarget && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)',
+                  padding: '24px',
+                  borderRadius: '16px',
+                  marginBottom: '24px',
+                  border: '1px solid #f59e0b'
+                }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#92400e', marginBottom: '16px' }}>
+                    Current Month Savings Progress
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
+                    <div>
+                      <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>Target Amount</p>
+                      <p style={{ fontSize: '20px', fontWeight: '700', color: '#92400e', margin: 0 }}>
+                        {formatCurrency(currentTarget.targetAmount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>Saved</p>
+                      <p style={{ fontSize: '20px', fontWeight: '700', color: '#059669', margin: 0 }}>
+                        {formatCurrency(currentTarget.currentSaved)}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>Remaining</p>
+                      <p style={{ fontSize: '20px', fontWeight: '700', color: '#dc2626', margin: 0 }}>
+                        {formatCurrency(Math.max(0, currentTarget.targetAmount - currentTarget.currentSaved))}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Progress</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>
+                        {((currentTarget.currentSaved / currentTarget.targetAmount) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{
+                      background: '#e5e7eb',
+                      height: '8px',
+                      borderRadius: '4px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        background: (currentTarget.currentSaved / currentTarget.targetAmount) >= 1 ? '#059669' : '#3b82f6',
+                        height: '100%',
+                        width: `${Math.min(100, (currentTarget.currentSaved / currentTarget.targetAmount) * 100)}%`,
+                        transition: 'all 0.3s ease'
+                      }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showSavingsForm && (
+                <div style={{
+                  background: '#f8fafc',
+                  padding: '24px',
+                  borderRadius: '16px',
+                  marginBottom: '24px'
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Target Amount
+                      </label>
+                      <input
+                        type="number"
+                        value={savingsForm.targetAmount}
+                        onChange={(e) => setSavingsForm(prev => ({ ...prev, targetAmount: e.target.value }))}
+                        placeholder="0.00"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                        Month
+                      </label>
+                      <input
+                        type="month"
+                        value={savingsForm.month}
+                        onChange={(e) => setSavingsForm(prev => ({ ...prev, month: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      onClick={handleAddSavingsTarget}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 20px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Save style={{ height: '16px', width: '16px' }} />
+                      Set Target
+                    </button>
+                    <button
+                      onClick={() => setShowSavingsForm(false)}
+                      style={{
+                        padding: '12px 20px',
+                        background: '#f3f4f6',
+                        color: '#374151',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Savings History */}
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a202c', marginBottom: '16px' }}>
+                  Savings History
+                </h3>
+                {savingsTargets.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
+                    <PiggyBank style={{ height: '48px', width: '48px', color: '#cbd5e1', margin: '0 auto 16px' }} />
+                    <p style={{ fontSize: '16px', fontWeight: '600' }}>No savings targets set</p>
+                    <p style={{ fontSize: '14px' }}>Set your first savings target to track progress</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {savingsTargets.map((target) => (
+                      <div
+                        key={target.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          background: target.isActive ? '#f0fdf4' : '#ffffff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '12px'
+                        }}
+                      >
+                        <div>
+                          <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1a202c', margin: '0 0 4px 0' }}>
+                            {new Date(target.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                          </h4>
+                          <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+                            Target: {formatCurrency(target.targetAmount)} • 
+                            Saved: {formatCurrency(target.currentSaved)} • 
+                            <span style={{ 
+                              color: target.isActive ? '#059669' : '#64748b',
+                              fontWeight: '600',
+                              marginLeft: '4px'
+                            }}>
+                              {target.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </p>
+                        </div>
+                        <div style={{
+                          padding: '4px 12px',
+                          background: target.currentSaved >= target.targetAmount ? '#f0fdf4' : '#fef3c7',
+                          color: target.currentSaved >= target.targetAmount ? '#059669' : '#92400e',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          {target.currentSaved >= target.targetAmount ? 'Target Achieved' : 'In Progress'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
