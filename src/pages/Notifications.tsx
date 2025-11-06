@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, CheckCircle, AlertCircle, Info, X, Filter, Plus, Calendar, 
   DollarSign, TrendingUp, Target, Clock, Edit, Trash2, Save, AlertTriangle,
@@ -169,149 +169,218 @@ const Notifications: React.FC = () => {
       checkSavingsProgress();
       checkReminders();
     }
-  }, [transactions, budgetLimits, savingsTargets, reminders, user]);
+  }, [transactions, user]);
 
-  const checkBudgetAlerts = () => {
+  const checkBudgetAlerts = useCallback(() => {
     if (!user) return;
 
     const currentMonth = new Date().toISOString().slice(0, 7);
-    const activeBudget = budgetLimits.find(b => b.isActive && b.month === currentMonth);
     
-    if (activeBudget) {
-      // Calculate current month spending
-      const currentMonthSpending = transactions
-        .filter(t => 
-          t.type === 'debit' && 
-          t.date.startsWith(currentMonth)
-        )
-        .reduce((sum, t) => sum + t.amount, 0);
+    setBudgetLimits(prevBudgets => {
+      const activeBudget = prevBudgets.find(b => b.isActive && b.month === currentMonth);
+      
+      if (activeBudget) {
+        // Calculate current month spending
+        const currentMonthSpending = transactions
+          .filter(t => 
+            t.type === 'debit' && 
+            t.date.startsWith(currentMonth)
+          )
+          .reduce((sum, t) => sum + t.amount, 0);
 
-      // Update current spent
-      const updatedBudgets = budgetLimits.map(b =>
-        b.id === activeBudget.id ? { ...b, currentSpent: currentMonthSpending } : b
-      );
-      setBudgetLimits(updatedBudgets);
-      localStorage.setItem(`budgetLimits_${user.id}`, JSON.stringify(updatedBudgets));
-
-      const spentPercentage = (currentMonthSpending / activeBudget.amount) * 100;
-
-      // Check for 80% warning
-      if (spentPercentage >= 80 && spentPercentage < 100) {
-        const existingAlert = notifications.find(n => 
-          n.category === 'budget' && 
-          n.message.includes('80%') &&
-          n.timestamp.toDateString() === new Date().toDateString()
+        // Update current spent
+        const updatedBudgets = prevBudgets.map(b =>
+          b.id === activeBudget.id ? { ...b, currentSpent: currentMonthSpending } : b
         );
+        
+        if (user) {
+          localStorage.setItem(`budgetLimits_${user.id}`, JSON.stringify(updatedBudgets));
+        }
 
-        if (!existingAlert) {
-          addNotification({
-            title: 'Budget Alert - 80% Limit Reached',
-            message: `You've spent ${spentPercentage.toFixed(1)}% (₹${currentMonthSpending.toFixed(2)}) of your monthly budget (₹${activeBudget.amount}). Consider monitoring your expenses.`,
-            type: 'warning',
-            category: 'budget'
+        const spentPercentage = (currentMonthSpending / activeBudget.amount) * 100;
+
+        // Check for 80% warning
+        if (spentPercentage >= 80 && spentPercentage < 100) {
+          setNotifications(prevNotifications => {
+            const existingAlert = prevNotifications.find(n => 
+              n.category === 'budget' && 
+              n.message.includes('80%') &&
+              n.timestamp.toDateString() === new Date().toDateString()
+            );
+
+            if (!existingAlert) {
+              const newNotification: Notification = {
+                id: Date.now().toString(),
+                title: 'Budget Alert - 80% Limit Reached',
+                message: `You've spent ${spentPercentage.toFixed(1)}% (₹${currentMonthSpending.toFixed(2)}) of your monthly budget (₹${activeBudget.amount}). Consider monitoring your expenses.`,
+                type: 'warning',
+                timestamp: new Date(),
+                read: false,
+                category: 'budget'
+              };
+              
+              const updatedNotifications = [...prevNotifications, newNotification];
+              if (user) {
+                localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
+              }
+              return updatedNotifications;
+            }
+            return prevNotifications;
           });
         }
-      }
 
-      // Check for 100% warning
-      if (spentPercentage >= 100) {
-        const existingAlert = notifications.find(n => 
-          n.category === 'budget' && 
-          n.message.includes('exceeded') &&
-          n.timestamp.toDateString() === new Date().toDateString()
-        );
+        // Check for 100% warning
+        if (spentPercentage >= 100) {
+          setNotifications(prevNotifications => {
+            const existingAlert = prevNotifications.find(n => 
+              n.category === 'budget' && 
+              n.message.includes('100%') &&
+              n.timestamp.toDateString() === new Date().toDateString()
+            );
 
-        if (!existingAlert) {
-          addNotification({
-            title: 'Budget Limit Exceeded!',
-            message: `You've exceeded your monthly budget! Spent ₹${currentMonthSpending.toFixed(2)} out of ₹${activeBudget.amount} (${spentPercentage.toFixed(1)}%).`,
-            type: 'error',
-            category: 'budget'
+            if (!existingAlert) {
+              const newNotification: Notification = {
+                id: Date.now().toString() + '_100',
+                title: 'Budget Limit Exceeded!',
+                message: `You've exceeded your monthly budget! Spent ${spentPercentage.toFixed(1)}% (₹${currentMonthSpending.toFixed(2)}) of your budget (₹${activeBudget.amount}). Immediate attention required.`,
+                type: 'error',
+                timestamp: new Date(),
+                read: false,
+                category: 'budget'
+              };
+              
+              const updatedNotifications = [...prevNotifications, newNotification];
+              if (user) {
+                localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
+              }
+              return updatedNotifications;
+            }
+            return prevNotifications;
           });
         }
-      }
-    }
-  };
 
-  const checkSavingsProgress = () => {
+        return updatedBudgets;
+      }
+      return prevBudgets;
+    });
+  }, [user, transactions]);
+
+  const checkSavingsProgress = useCallback(() => {
     if (!user) return;
 
     const currentMonth = new Date().toISOString().slice(0, 7);
-    const activeTarget = savingsTargets.find(t => t.isActive && t.month === currentMonth);
     
-    if (activeTarget) {
-      // Calculate current month savings (credits - debits)
-      const currentMonthCredits = transactions
-        .filter(t => 
-          t.type === 'credit' && 
-          t.date.startsWith(currentMonth)
-        )
-        .reduce((sum, t) => sum + t.amount, 0);
+    setSavingsTargets(prevTargets => {
+      const activeTarget = prevTargets.find(t => t.isActive && t.month === currentMonth);
+      
+      if (activeTarget) {
+        // Calculate current month savings (credits - debits)
+        const currentMonthCredits = transactions
+          .filter(t => 
+            t.type === 'credit' && 
+            t.date.startsWith(currentMonth)
+          )
+          .reduce((sum, t) => sum + t.amount, 0);
 
-      const currentMonthDebits = transactions
-        .filter(t => 
-          t.type === 'debit' && 
-          t.date.startsWith(currentMonth)
-        )
-        .reduce((sum, t) => sum + t.amount, 0);
+        const currentMonthDebits = transactions
+          .filter(t => 
+            t.type === 'debit' && 
+            t.date.startsWith(currentMonth)
+          )
+          .reduce((sum, t) => sum + t.amount, 0);
 
-      const currentSavings = Math.max(0, currentMonthCredits - currentMonthDebits);
+        const currentSavings = Math.max(0, currentMonthCredits - currentMonthDebits);
 
-      // Update current saved
-      const updatedTargets = savingsTargets.map(t =>
-        t.id === activeTarget.id ? { ...t, currentSaved: currentSavings } : t
-      );
-      setSavingsTargets(updatedTargets);
-      localStorage.setItem(`savingsTargets_${user.id}`, JSON.stringify(updatedTargets));
-
-      const savedPercentage = (currentSavings / activeTarget.targetAmount) * 100;
-      const remainingAmount = activeTarget.targetAmount - currentSavings;
-
-      // Only send notification if there's meaningful progress
-      if (savedPercentage > 0) {
-        const existingUpdate = notifications.find(n => 
-          n.category === 'savings' && 
-          n.timestamp.toDateString() === new Date().toDateString()
+        // Update current saved
+        const updatedTargets = prevTargets.map(t =>
+          t.id === activeTarget.id ? { ...t, currentSaved: currentSavings } : t
         );
+        
+        if (user) {
+          localStorage.setItem(`savingsTargets_${user.id}`, JSON.stringify(updatedTargets));
+        }
 
-        if (!existingUpdate) {
-          addNotification({
-            title: 'Savings Progress Update',
-            message: `You've saved ${savedPercentage.toFixed(1)}% (₹${currentSavings.toFixed(2)}) of your target (₹${activeTarget.targetAmount}). ${remainingAmount > 0 ? `Still need to save ₹${remainingAmount.toFixed(2)} this month.` : 'Congratulations! Target achieved!'}`,
-            type: savedPercentage >= 100 ? 'success' : 'info',
-            category: 'savings'
+        const savedPercentage = (currentSavings / activeTarget.targetAmount) * 100;
+        const remainingAmount = activeTarget.targetAmount - currentSavings;
+
+        // Only send notification if there's meaningful progress
+        if (savedPercentage > 0) {
+          setNotifications(prevNotifications => {
+            const existingUpdate = prevNotifications.find(n => 
+              n.category === 'savings' && 
+              n.timestamp.toDateString() === new Date().toDateString()
+            );
+
+            if (!existingUpdate) {
+              const newNotification: Notification = {
+                id: Date.now().toString(),
+                title: 'Savings Progress Update',
+                message: `You've saved ${savedPercentage.toFixed(1)}% (₹${currentSavings.toFixed(2)}) of your target (₹${activeTarget.targetAmount}). ${remainingAmount > 0 ? `Still need to save ₹${remainingAmount.toFixed(2)} this month.` : 'Congratulations! Target achieved!'}`,
+                type: savedPercentage >= 100 ? 'success' : 'info',
+                timestamp: new Date(),
+                read: false,
+                category: 'savings'
+              };
+              
+              const updatedNotifications = [...prevNotifications, newNotification];
+              if (user) {
+                localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
+              }
+              return updatedNotifications;
+            }
+            return prevNotifications;
           });
         }
-      }
-    }
-  };
 
-  const checkReminders = () => {
+        return updatedTargets;
+      }
+      return prevTargets;
+    });
+  }, [user, transactions]);
+
+  const checkReminders = useCallback(() => {
     if (!user) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const upcomingReminders = reminders.filter(r => 
-      !r.isCompleted && 
-      r.date === today
-    );
-
-    upcomingReminders.forEach(reminder => {
-      const existingReminder = notifications.find(n => 
-        n.category === 'reminder' && 
-        n.message.includes(reminder.description) &&
-        n.timestamp.toDateString() === new Date().toDateString()
+    
+    setReminders(prevReminders => {
+      const upcomingReminders = prevReminders.filter(r => 
+        !r.isCompleted && 
+        r.date === today
       );
 
-      if (!existingReminder) {
-        addNotification({
-          title: `Payment Reminder - ${reminder.type === 'collect' ? 'Collect Money' : 'Pay Money'}`,
-          message: `${reminder.description} - ₹${reminder.amount} is due today.`,
-          type: 'warning',
-          category: 'reminder'
+      upcomingReminders.forEach(reminder => {
+        setNotifications(prevNotifications => {
+          const existingReminder = prevNotifications.find(n => 
+            n.category === 'reminder' && 
+            n.message.includes(reminder.description) &&
+            n.timestamp.toDateString() === new Date().toDateString()
+          );
+
+          if (!existingReminder) {
+            const newNotification: Notification = {
+              id: Date.now().toString() + '_' + reminder.id,
+              title: `Payment Reminder - ${reminder.type === 'collect' ? 'Collect Money' : 'Pay Money'}`,
+              message: `${reminder.description} - ₹${reminder.amount} is due today.`,
+              type: 'warning',
+              timestamp: new Date(),
+              read: false,
+              category: 'reminder'
+            };
+            
+            const updatedNotifications = [...prevNotifications, newNotification];
+            if (user) {
+              localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
+            }
+            return updatedNotifications;
+          }
+          return prevNotifications;
         });
-      }
+      });
+
+      return prevReminders;
     });
-  };
+  }, [user]);
 
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     if (!user) return;
@@ -374,16 +443,6 @@ const Notifications: React.FC = () => {
     );
     setReminders(updatedReminders);
     localStorage.setItem(`reminders_${user.id}`, JSON.stringify(updatedReminders));
-
-    const reminder = reminders.find(r => r.id === id);
-    if (reminder) {
-      addNotification({
-        title: 'Reminder Updated',
-        message: `Reminder "${reminder.description}" marked as ${!reminder.isCompleted ? 'completed' : 'pending'}.`,
-        type: 'info',
-        category: 'reminder'
-      });
-    }
   };
 
   const deleteReminder = (id: string) => {
@@ -392,13 +451,6 @@ const Notifications: React.FC = () => {
     const updatedReminders = reminders.filter(r => r.id !== id);
     setReminders(updatedReminders);
     localStorage.setItem(`reminders_${user.id}`, JSON.stringify(updatedReminders));
-
-    addNotification({
-      title: 'Reminder Deleted',
-      message: 'Reminder has been deleted successfully.',
-      type: 'info',
-      category: 'reminder'
-    });
   };
 
   // Budget functions
@@ -916,7 +968,16 @@ const Notifications: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {(() => {
                   const today = new Date().toISOString().split('T')[0];
-                  const todayReminders = reminders.filter(r => r.date === today);
+                  const todayReminders = reminders
+                    .filter(r => r.date === today)
+                    .sort((a, b) => {
+                      // Sort by completion status first (non-completed first)
+                      if (a.isCompleted !== b.isCompleted) {
+                        return a.isCompleted ? 1 : -1;
+                      }
+                      // Then sort by date in increasing order
+                      return new Date(a.date).getTime() - new Date(b.date).getTime();
+                    });
                   
                   if (todayReminders.length === 0) {
                     return (
@@ -1305,7 +1366,16 @@ const Notifications: React.FC = () => {
                     <p style={{ fontSize: '14px' }}>Add your first payment reminder to get started</p>
                   </div>
                 ) : (
-                  reminders.map((reminder) => (
+                  reminders
+                    .sort((a, b) => {
+                      // Sort by completion status first (non-completed first)
+                      if (a.isCompleted !== b.isCompleted) {
+                        return a.isCompleted ? 1 : -1;
+                      }
+                      // Then sort by date in increasing order
+                      return new Date(a.date).getTime() - new Date(b.date).getTime();
+                    })
+                    .map((reminder) => (
                     <div
                       key={reminder.id}
                       style={{

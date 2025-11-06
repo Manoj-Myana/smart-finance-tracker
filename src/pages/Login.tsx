@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
+import Toast from '../components/Toast';
+import { getTodayNotificationCount, generateNotificationMessage } from '../utils/notificationUtils';
 
 const Login: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -10,6 +12,8 @@ const Login: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,8 +50,19 @@ const Login: React.FC = () => {
         localStorage.setItem('authToken', data.data.token);
         localStorage.setItem('userData', JSON.stringify(data.data.user));
         
-        // Navigate to dashboard
-        navigate('/dashboard');
+        // Get today's notification count and show toast
+        const user = data.data.user;
+        const todayNotificationCount = getTodayNotificationCount(user);
+        const notificationMessage = generateNotificationMessage(todayNotificationCount);
+        
+        // Show toast notification
+        setToastMessage(notificationMessage);
+        setShowToast(true);
+        
+        // Navigate to dashboard after a short delay to allow user to see the toast
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
       } else {
         // Login failed
         setError(data.message || 'Login failed. Please check your credentials.');
@@ -199,6 +214,13 @@ const Login: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Toast Notification */}
+      <Toast 
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 };

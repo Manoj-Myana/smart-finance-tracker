@@ -18,6 +18,8 @@ import {
   Bell,
   FileText
 } from 'lucide-react';
+import Toast from '../components/Toast';
+import { getTodayNotificationCount, generateNotificationMessage } from '../utils/notificationUtils';
 
 interface UserType {
   id: number;
@@ -60,6 +62,9 @@ interface DashboardStats {
 const Dashboard: React.FC = () => {
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [hasShownLoginToast, setHasShownLoginToast] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     totalBalance: 0,
     monthlyIncome: 0,
@@ -87,11 +92,25 @@ const Dashboard: React.FC = () => {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
       fetchDashboardData(parsedUser.id);
+      
+      // Show notification toast only if not shown yet in this session
+      if (!hasShownLoginToast) {
+        // Small delay to ensure dashboard loads smoothly
+        setTimeout(() => {
+          const todayNotificationCount = getTodayNotificationCount(parsedUser);
+          if (todayNotificationCount > 0) {
+            const notificationMessage = generateNotificationMessage(todayNotificationCount);
+            setToastMessage(notificationMessage);
+            setShowToast(true);
+            setHasShownLoginToast(true);
+          }
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error parsing user data:', error);
       navigate('/login');
     }
-  }, [navigate]);
+  }, [navigate, hasShownLoginToast]);
 
   const fetchDashboardData = async (userId: number) => {
     try {
@@ -1125,6 +1144,13 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </main>
+      
+      {/* Toast Notification */}
+      <Toast 
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 };
