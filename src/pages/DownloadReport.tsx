@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, Calendar, Filter, TrendingUp, PieChart, BarChart, Search, IndianRupee } from 'lucide-react';
+import { Download, FileText, Calendar, Filter, TrendingUp, PieChart, BarChart, Search, IndianRupee, X } from 'lucide-react';
 
 interface Transaction {
   id: number;
@@ -33,10 +33,37 @@ interface ReportConfig {
   amountMax: string;
 }
 
+interface RecentReport {
+  id: string;
+  title: string;
+  type: 'transactions' | 'budget' | 'analytics' | 'summary';
+  format: 'pdf' | 'excel' | 'csv';
+  generatedAt: string;
+  filters: {
+    dateRange: string;
+    transactionType: string;
+    frequency: string;
+    searchTerm?: string;
+    amountRange?: string;
+  };
+  dataSnapshot: {
+    totalTransactions: number;
+    totalCredit: number;
+    totalDebit: number;
+    balance: number;
+  };
+  reportData: any; // Store the actual report data for re-download
+  size: string; // File size estimate
+}
+
 const DownloadReport: React.FC = () => {
   const [user, setUser] = useState<UserType | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recentReports, setRecentReports] = useState<RecentReport[]>([]);
+  const [previewReport, setPreviewReport] = useState<RecentReport | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState<'generate' | 'recent'>('generate');
   const [config, setConfig] = useState<ReportConfig>({
     type: 'transactions',
     format: 'pdf',
@@ -60,6 +87,7 @@ const DownloadReport: React.FC = () => {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
         fetchTransactions(parsedUser.id);
+        loadRecentReports(parsedUser.id);
       } catch (error) {
         console.error('Error parsing user data:', error);
         setLoading(false);
@@ -89,6 +117,121 @@ const DownloadReport: React.FC = () => {
       console.error('Error fetching transactions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load recent reports from localStorage
+  const loadRecentReports = (userId: number) => {
+    try {
+      const savedReports = localStorage.getItem(`recentReports_${userId}`);
+      if (savedReports) {
+        const reports = JSON.parse(savedReports);
+        // Sort by generation date (newest first)
+        reports.sort((a: RecentReport, b: RecentReport) => 
+          new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
+        );
+        setRecentReports(reports.slice(0, 10)); // Keep only last 10 reports
+      }
+    } catch (error) {
+      console.error('Error loading recent reports:', error);
+    }
+  };
+
+  // Save report to recent reports
+  const saveToRecentReports = (reportData: any) => {
+    if (!user) return;
+
+    const newReport: RecentReport = {
+      id: `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: `${reportData.title} - ${new Date().toLocaleDateString()}`,
+      type: config.type,
+      format: config.format,
+      generatedAt: new Date().toISOString(),
+      filters: {
+        dateRange: config.dateRange,
+        transactionType: config.transactionType,
+        frequency: config.frequency,
+        searchTerm: config.searchTerm || undefined,
+        amountRange: config.amountMin || config.amountMax 
+          ? `₹${config.amountMin || '0'} - ₹${config.amountMax || '∞'}` 
+          : 'All'
+      },
+      dataSnapshot: {
+        totalTransactions: reportData.statistics.totalTransactions,
+        totalCredit: reportData.statistics.totalCredit,
+        totalDebit: reportData.statistics.totalDebit,
+        balance: reportData.statistics.balance
+      },
+      reportData: reportData,
+      size: estimateFileSize(reportData, config.format)
+    };
+
+    const updatedReports = [newReport, ...recentReports].slice(0, 10);
+    setRecentReports(updatedReports);
+    
+    // Save to localStorage
+    try {
+      localStorage.setItem(`recentReports_${user.id}`, JSON.stringify(updatedReports));
+    } catch (error) {
+      console.error('Error saving recent report:', error);
+    }
+  };
+
+  // Estimate file size
+  const estimateFileSize = (reportData: any, format: string): string => {
+    const transactionCount = reportData.statistics.totalTransactions;
+    let baseSize = 0;
+
+    switch (format) {
+      case 'pdf':
+        baseSize = 50 + (transactionCount * 0.5); // KB
+        break;
+      case 'excel':
+        baseSize = 30 + (transactionCount * 0.3); // KB
+        break;
+      case 'csv':
+        baseSize = 10 + (transactionCount * 0.1); // KB
+        break;
+    }
+
+    if (reportData.config?.includeCharts) {
+      baseSize += 20; // Additional KB for charts
+    }
+
+    if (baseSize < 1024) {
+      return `${Math.round(baseSize)} KB`;
+    } else {
+      return `${(baseSize / 1024).toFixed(1)} MB`;
+    }
+  };
+
+  // Delete report from recent reports
+  const deleteRecentReport = (reportId: string) => {
+    if (!user) return;
+    
+    const updatedReports = recentReports.filter(report => report.id !== reportId);
+    setRecentReports(updatedReports);
+    
+    try {
+      localStorage.setItem(`recentReports_${user.id}`, JSON.stringify(updatedReports));
+    } catch (error) {
+      console.error('Error deleting recent report:', error);
+    }
+  };
+
+  // Preview report
+  const previewReportHandler = (report: RecentReport) => {
+    setPreviewReport(report);
+    setShowPreview(true);
+  };
+
+  // Download existing report
+  const downloadExistingReport = async (report: RecentReport) => {
+    try {
+      await downloadReport(report.reportData, report.format);
+    } catch (error) {
+      console.error('Error downloading existing report:', error);
+      alert('Failed to download report. Please try again.');
     }
   };
 
@@ -200,6 +343,17 @@ const DownloadReport: React.FC = () => {
     }
   ];
 
+  // Helper function to get type-specific colors
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'transactions': return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      case 'budget': return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+      case 'analytics': return 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+      case 'summary': return 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
+      default: return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    }
+  };
+
   const formatOptions = [
     { value: 'pdf' as const, label: 'PDF Document', description: 'Best for viewing and printing' },
     { value: 'excel' as const, label: 'Excel Spreadsheet', description: 'Best for data analysis' },
@@ -219,39 +373,16 @@ const DownloadReport: React.FC = () => {
     setIsGenerating(true);
     
     try {
-      // Prepare report data
-      const reportData = {
-        user: user,
-        transactions: filteredTransactions,
-        statistics: {
-          totalTransactions: filteredTransactions.length,
-          totalCredit: totalCredit,
-          totalDebit: totalDebit,
-          balance: balance,
-          averageTransaction: averageTransaction,
-          creditTransactions: filteredTransactions.filter(t => t.type === 'credit').length,
-          debitTransactions: filteredTransactions.filter(t => t.type === 'debit').length
-        },
-        filters: {
-          dateRange: config.dateRange,
-          startDate: config.startDate,
-          endDate: config.endDate,
-          transactionType: config.transactionType,
-          frequency: config.frequency,
-          searchTerm: config.searchTerm,
-          amountRange: config.amountMin || config.amountMax 
-            ? `₹${config.amountMin || '0'} - ₹${config.amountMax || '∞'}` 
-            : 'All'
-        },
-        config: config,
-        generatedAt: new Date().toISOString()
-      };
-
+      // Generate report data based on selected type
+      const reportData = await generateReportDataByType();
+      
       // Simulate API call for report generation
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // In a real implementation, you would call your backend API here
       console.log('Generating report with data:', reportData);
+      
+      // Save to recent reports before downloading
+      saveToRecentReports(reportData);
       
       // Create a downloadable file based on format
       await downloadReport(reportData);
@@ -264,18 +395,98 @@ const DownloadReport: React.FC = () => {
     }
   };
 
-  const downloadReport = async (reportData: any) => {
-    const baseFileName = `${config.type}_report_${new Date().toISOString().split('T')[0]}`;
+  const generateReportDataByType = async () => {
+    const baseData = {
+      user: user,
+      transactions: filteredTransactions,
+      statistics: {
+        totalTransactions: filteredTransactions.length,
+        totalCredit: totalCredit,
+        totalDebit: totalDebit,
+        balance: balance,
+        averageTransaction: averageTransaction,
+        creditTransactions: filteredTransactions.filter(t => t.type === 'credit').length,
+        debitTransactions: filteredTransactions.filter(t => t.type === 'debit').length
+      },
+      filters: {
+        dateRange: config.dateRange,
+        startDate: config.startDate,
+        endDate: config.endDate,
+        transactionType: config.transactionType,
+        frequency: config.frequency,
+        searchTerm: config.searchTerm,
+        amountRange: config.amountMin || config.amountMax 
+          ? `₹${config.amountMin || '0'} - ₹${config.amountMax || '∞'}` 
+          : 'All'
+      },
+      config: config,
+      generatedAt: new Date().toISOString(),
+      reportType: config.type
+    };
+
+    // Add specific data based on report type
+    switch (config.type) {
+      case 'transactions':
+        return {
+          ...baseData,
+          title: 'Transaction Report',
+          subtitle: 'Detailed transaction history with comprehensive analysis',
+          sections: ['filters', 'summary', 'charts', 'transactions', 'insights'],
+          insights: generateTransactionInsights(filteredTransactions),
+          categorization: categorizeTransactions(filteredTransactions)
+        };
+
+      case 'budget':
+        return {
+          ...baseData,
+          title: 'Budget Analysis Report',
+          subtitle: 'Budget performance and spending pattern analysis',
+          sections: ['filters', 'budget-summary', 'charts', 'budget-analysis', 'recommendations'],
+          budgetData: generateBudgetAnalysis(filteredTransactions),
+          recommendations: generateBudgetRecommendations(filteredTransactions)
+        };
+
+      case 'analytics':
+        return {
+          ...baseData,
+          title: 'Financial Analytics Report',
+          subtitle: 'Comprehensive financial analysis with trends and projections',
+          sections: ['filters', 'analytics-summary', 'charts', 'trends', 'projections', 'insights'],
+          analytics: generateAdvancedAnalytics(filteredTransactions),
+          trends: generateTrendAnalysis(filteredTransactions),
+          projections: generateProjections(filteredTransactions)
+        };
+
+      case 'summary':
+        return {
+          ...baseData,
+          title: 'Executive Summary Report',
+          subtitle: 'High-level financial overview and key performance indicators',
+          sections: ['executive-summary', 'key-metrics', 'charts', 'highlights'],
+          executiveSummary: generateExecutiveSummary(filteredTransactions),
+          keyMetrics: generateKeyMetrics(filteredTransactions),
+          highlights: generateFinancialHighlights(filteredTransactions)
+        };
+
+      default:
+        return baseData;
+    }
+  };
+
+  const downloadReport = async (reportData: any, format?: string) => {
+    const reportFormat = format || config.format;
+    const reportType = reportData.reportType || config.type;
+    const baseFileName = `${reportType}_report_${new Date().toISOString().split('T')[0]}`;
     
-    if (config.format === 'csv') {
+    if (reportFormat === 'csv') {
       // Generate CSV with chart data if enabled
       const csvContent = generateCSV(reportData.transactions, reportData);
       downloadFile(csvContent, `${baseFileName}.csv`, 'text/csv');
-    } else if (config.format === 'excel') {
+    } else if (reportFormat === 'excel') {
       // Generate Excel-compatible CSV with enhanced formatting and charts
       const excelContent = generateExcelCSV(reportData);
       downloadFile(excelContent, `${baseFileName}.xls`, 'application/vnd.ms-excel');
-    } else if (config.format === 'pdf') {
+    } else if (reportFormat === 'pdf') {
       // Generate HTML content that can be converted to PDF with charts
       const htmlContent = generateHTMLForPDF(reportData);
       // Create a blob with HTML content that browsers can handle
@@ -427,6 +638,502 @@ const DownloadReport: React.FC = () => {
     });
     
     return lines.join('\n');
+  };
+
+  // Helper functions for different report types
+  const generateTransactionInsights = (transactions: Transaction[]) => {
+    const insights = [];
+    const frequencyMap = transactions.reduce((acc, t) => {
+      acc[t.frequency] = (acc[t.frequency] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const avgAmount = transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length;
+    const maxTransaction = Math.max(...transactions.map(t => t.amount));
+    const minTransaction = Math.min(...transactions.map(t => t.amount));
+
+    insights.push({
+      type: 'spending_pattern',
+      title: 'Spending Pattern Analysis',
+      content: `Your transactions show ${frequencyMap.regular > frequencyMap.irregular ? 'regular' : 'irregular'} spending patterns with an average transaction of ${formatCurrency(avgAmount)}.`
+    });
+
+    insights.push({
+      type: 'transaction_range',
+      title: 'Transaction Range',
+      content: `Transaction amounts range from ${formatCurrency(minTransaction)} to ${formatCurrency(maxTransaction)}, indicating ${maxTransaction - minTransaction > 50000 ? 'varied' : 'consistent'} spending behavior.`
+    });
+
+    return insights;
+  };
+
+  const generateBudgetAnalysis = (transactions: Transaction[]) => {
+    const monthlySpending = transactions.reduce((acc, t) => {
+      const month = new Date(t.date).toISOString().slice(0, 7);
+      acc[month] = (acc[month] || 0) + (t.type === 'debit' ? t.amount : 0);
+      return acc;
+    }, {} as Record<string, number>);
+
+    const avgMonthlySpending = Object.values(monthlySpending).reduce((a, b) => a + b, 0) / Object.keys(monthlySpending).length;
+    
+    return {
+      monthlySpending,
+      avgMonthlySpending,
+      budgetVariance: Object.values(monthlySpending).map(spending => ({
+        month: Object.keys(monthlySpending)[Object.values(monthlySpending).indexOf(spending)],
+        actual: spending,
+        variance: spending - avgMonthlySpending
+      }))
+    };
+  };
+
+  const generateBudgetRecommendations = (transactions: Transaction[]) => {
+    const recommendations = [];
+    const totalDebit = transactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.amount, 0);
+    const totalCredit = transactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0);
+
+    if (totalDebit > totalCredit * 0.8) {
+      recommendations.push({
+        priority: 'high',
+        category: 'spending',
+        title: 'Reduce Spending',
+        description: 'Your spending is quite high relative to income. Consider reducing discretionary expenses.'
+      });
+    }
+
+    recommendations.push({
+      priority: 'medium',
+      category: 'saving',
+      title: 'Emergency Fund',
+      description: 'Build an emergency fund covering 3-6 months of expenses for financial security.'
+    });
+
+    return recommendations;
+  };
+
+  const generateAdvancedAnalytics = (transactions: Transaction[]) => {
+    const analytics = {
+      cashFlow: {
+        netFlow: transactions.reduce((sum, t) => sum + (t.type === 'credit' ? t.amount : -t.amount), 0),
+        volatility: calculateVolatility(transactions),
+        trend: calculateTrend(transactions)
+      },
+      categorization: categorizeTransactions(transactions),
+      seasonality: analyzeSeasonality(transactions)
+    };
+
+    return analytics;
+  };
+
+  const generateTrendAnalysis = (transactions: Transaction[]) => {
+    const monthlyData = transactions.reduce((acc, t) => {
+      const month = new Date(t.date).toISOString().slice(0, 7);
+      if (!acc[month]) acc[month] = { credit: 0, debit: 0, count: 0 };
+      acc[month][t.type] += t.amount;
+      acc[month].count += 1;
+      return acc;
+    }, {} as Record<string, any>);
+
+    return {
+      monthlyData,
+      growthRate: calculateGrowthRate(monthlyData),
+      predictedNextMonth: predictNextMonth(monthlyData)
+    };
+  };
+
+  const generateProjections = (transactions: Transaction[]) => {
+    const recentTransactions = transactions.slice(-30); // Last 30 transactions
+    const avgIncome = recentTransactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0) / recentTransactions.filter(t => t.type === 'credit').length;
+    const avgExpense = recentTransactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.amount, 0) / recentTransactions.filter(t => t.type === 'debit').length;
+
+    return {
+      next3Months: {
+        expectedIncome: avgIncome * 3,
+        expectedExpenses: avgExpense * 3,
+        projectedBalance: (avgIncome - avgExpense) * 3
+      },
+      yearEnd: {
+        expectedIncome: avgIncome * 12,
+        expectedExpenses: avgExpense * 12,
+        projectedBalance: (avgIncome - avgExpense) * 12
+      }
+    };
+  };
+
+  const generateExecutiveSummary = (transactions: Transaction[]) => {
+    const totalCredit = transactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0);
+    const totalDebit = transactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.amount, 0);
+    const netPosition = totalCredit - totalDebit;
+
+    return {
+      overview: `Financial analysis of ${transactions.length} transactions showing ${netPosition >= 0 ? 'positive' : 'negative'} net position of ${formatCurrency(Math.abs(netPosition))}.`,
+      healthScore: calculateFinancialHealthScore(transactions),
+      keyFindings: [
+        `${netPosition >= 0 ? 'Surplus' : 'Deficit'} of ${formatCurrency(Math.abs(netPosition))}`,
+        `Average transaction value: ${formatCurrency(transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length)}`,
+        `Transaction frequency: ${transactions.length} transactions in selected period`
+      ]
+    };
+  };
+
+  const generateKeyMetrics = (transactions: Transaction[]) => {
+    return {
+      liquidityRatio: calculateLiquidityRatio(transactions),
+      savingsRate: calculateSavingsRate(transactions),
+      expenseRatio: calculateExpenseRatio(transactions),
+      transactionVelocity: transactions.length / getDaysBetween(transactions)
+    };
+  };
+
+  const generateFinancialHighlights = (transactions: Transaction[]) => {
+    const highlights = [];
+    const largestTransaction = transactions.reduce((max, t) => t.amount > max.amount ? t : max, transactions[0]);
+    const mostFrequentType = transactions.filter(t => t.type === 'credit').length > transactions.filter(t => t.type === 'debit').length ? 'credit' : 'debit';
+
+    highlights.push({
+      title: 'Largest Transaction',
+      value: formatCurrency(largestTransaction.amount),
+      description: `${largestTransaction.type} - ${largestTransaction.description}`,
+      type: largestTransaction.type
+    });
+
+    highlights.push({
+      title: 'Most Active Type',
+      value: mostFrequentType.toUpperCase(),
+      description: `${transactions.filter(t => t.type === mostFrequentType).length} ${mostFrequentType} transactions`,
+      type: mostFrequentType
+    });
+
+    return highlights;
+  };
+
+  // Utility functions for calculations
+  const categorizeTransactions = (transactions: Transaction[]) => {
+    return transactions.reduce((acc, t) => {
+      const category = t.amount > 10000 ? 'High Value' : t.amount > 1000 ? 'Medium Value' : 'Low Value';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  };
+
+  const calculateVolatility = (transactions: Transaction[]) => {
+    const amounts = transactions.map(t => t.amount);
+    const mean = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const variance = amounts.reduce((acc, amount) => acc + Math.pow(amount - mean, 2), 0) / amounts.length;
+    return Math.sqrt(variance);
+  };
+
+  const calculateTrend = (transactions: Transaction[]) => {
+    const monthlyAmounts = transactions.reduce((acc, t) => {
+      const month = new Date(t.date).toISOString().slice(0, 7);
+      acc[month] = (acc[month] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const values = Object.values(monthlyAmounts);
+    if (values.length < 2) return 0;
+    
+    const firstHalf = values.slice(0, Math.floor(values.length / 2)).reduce((a, b) => a + b, 0);
+    const secondHalf = values.slice(Math.floor(values.length / 2)).reduce((a, b) => a + b, 0);
+    
+    return secondHalf > firstHalf ? 1 : -1; // 1 for increasing, -1 for decreasing
+  };
+
+  const analyzeSeasonality = (transactions: Transaction[]) => {
+    const monthlyData = transactions.reduce((acc, t) => {
+      const month = new Date(t.date).getMonth();
+      acc[month] = (acc[month] || 0) + t.amount;
+      return acc;
+    }, {} as Record<number, number>);
+
+    return monthlyData;
+  };
+
+  const calculateGrowthRate = (monthlyData: Record<string, any>) => {
+    const months = Object.keys(monthlyData).sort();
+    if (months.length < 2) return 0;
+    
+    const firstMonth = monthlyData[months[0]];
+    const lastMonth = monthlyData[months[months.length - 1]];
+    
+    return ((lastMonth.credit - firstMonth.credit) / firstMonth.credit) * 100;
+  };
+
+  const predictNextMonth = (monthlyData: Record<string, any>) => {
+    const values = Object.values(monthlyData) as any[];
+    const avgCredit = values.reduce((sum, m) => sum + m.credit, 0) / values.length;
+    const avgDebit = values.reduce((sum, m) => sum + m.debit, 0) / values.length;
+    
+    return { credit: avgCredit, debit: avgDebit, netFlow: avgCredit - avgDebit };
+  };
+
+  const calculateFinancialHealthScore = (transactions: Transaction[]) => {
+    const totalCredit = transactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0);
+    const totalDebit = transactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.amount, 0);
+    const ratio = totalCredit / (totalDebit + totalCredit);
+    
+    if (ratio > 0.6) return { score: 85, rating: 'Excellent' };
+    if (ratio > 0.5) return { score: 70, rating: 'Good' };
+    if (ratio > 0.4) return { score: 55, rating: 'Fair' };
+    return { score: 35, rating: 'Needs Improvement' };
+  };
+
+  const calculateLiquidityRatio = (transactions: Transaction[]) => {
+    const recentCredits = transactions.filter(t => t.type === 'credit').slice(-10);
+    const recentDebits = transactions.filter(t => t.type === 'debit').slice(-10);
+    
+    const avgCredit = recentCredits.reduce((sum, t) => sum + t.amount, 0) / recentCredits.length;
+    const avgDebit = recentDebits.reduce((sum, t) => sum + t.amount, 0) / recentDebits.length;
+    
+    return avgCredit / avgDebit;
+  };
+
+  const calculateSavingsRate = (transactions: Transaction[]) => {
+    const totalCredit = transactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0);
+    const totalDebit = transactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.amount, 0);
+    
+    return ((totalCredit - totalDebit) / totalCredit) * 100;
+  };
+
+  const calculateExpenseRatio = (transactions: Transaction[]) => {
+    const totalCredit = transactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0);
+    const totalDebit = transactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.amount, 0);
+    
+    return (totalDebit / totalCredit) * 100;
+  };
+
+  const getDaysBetween = (transactions: Transaction[]) => {
+    if (transactions.length === 0) return 1;
+    const dates = transactions.map(t => new Date(t.date));
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    
+    return Math.max(1, Math.ceil((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)));
+  };
+
+  const generateTypeSpecificContent = (reportData: any) => {
+    const reportType = reportData.reportType || 'transactions';
+    
+    switch (reportType) {
+      case 'transactions':
+        return `
+          <div class="section">
+            <div class="section-title">Summary</div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Total Transactions</div>
+                <div class="summary-value">${reportData.statistics.totalTransactions}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Credit</div>
+                <div class="summary-value credit">${formatCurrency(reportData.statistics.totalCredit)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Debit</div>
+                <div class="summary-value debit">${formatCurrency(reportData.statistics.totalDebit)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Net Balance</div>
+                <div class="summary-value ${reportData.statistics.balance >= 0 ? 'credit' : 'debit'}">${formatCurrency(reportData.statistics.balance)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Average Transaction</div>
+                <div class="summary-value">${formatCurrency(reportData.statistics.averageTransaction)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Credit vs Debit</div>
+                <div class="summary-value">${reportData.statistics.creditTransactions} : ${reportData.statistics.debitTransactions}</div>
+              </div>
+            </div>
+          </div>
+          
+          ${reportData.insights ? `
+          <div class="section">
+            <div class="section-title">Transaction Insights</div>
+            ${reportData.insights.map((insight: any) => `
+              <div class="insight-item">
+                <div class="insight-title">${insight.title}</div>
+                <div>${insight.content}</div>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+        `;
+        
+      case 'budget':
+        return `
+          <div class="section">
+            <div class="section-title">Budget Summary</div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Total Transactions</div>
+                <div class="summary-value">${reportData.statistics.totalTransactions}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Monthly Average Spending</div>
+                <div class="summary-value debit">${formatCurrency(reportData.budgetData?.avgMonthlySpending || 0)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Income</div>
+                <div class="summary-value credit">${formatCurrency(reportData.statistics.totalCredit)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Expenses</div>
+                <div class="summary-value debit">${formatCurrency(reportData.statistics.totalDebit)}</div>
+              </div>
+            </div>
+          </div>
+          
+          ${reportData.recommendations ? `
+          <div class="section">
+            <div class="section-title">Budget Recommendations</div>
+            ${reportData.recommendations.map((rec: any) => `
+              <div class="recommendation-item">
+                <div class="recommendation-title">${rec.title} (${rec.priority.toUpperCase()} Priority)</div>
+                <div>${rec.description}</div>
+                <small><strong>Category:</strong> ${rec.category}</small>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+        `;
+        
+      case 'analytics':
+        return `
+          <div class="section">
+            <div class="section-title">Financial Analytics</div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Net Cash Flow</div>
+                <div class="summary-value ${reportData.analytics?.cashFlow?.netFlow >= 0 ? 'credit' : 'debit'}">${formatCurrency(reportData.analytics?.cashFlow?.netFlow || 0)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Volatility Score</div>
+                <div class="summary-value">${reportData.analytics?.cashFlow?.volatility?.toFixed(2) || 'N/A'}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Growth Trend</div>
+                <div class="summary-value">${reportData.trends?.growthRate?.toFixed(2) || 0}%</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Projected Next Month</div>
+                <div class="summary-value">${formatCurrency(reportData.trends?.predictedNextMonth?.netFlow || 0)}</div>
+              </div>
+            </div>
+          </div>
+          
+          ${reportData.projections ? `
+          <div class="section">
+            <div class="section-title">Financial Projections</div>
+            <div class="metric-grid">
+              <div class="metric-card">
+                <div class="metric-value">${formatCurrency(reportData.projections.next3Months?.projectedBalance || 0)}</div>
+                <div class="metric-label">3-Month Projection</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value">${formatCurrency(reportData.projections.yearEnd?.projectedBalance || 0)}</div>
+                <div class="metric-label">Year-End Projection</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value">${formatCurrency(reportData.projections.next3Months?.expectedIncome || 0)}</div>
+                <div class="metric-label">Expected 3M Income</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value">${formatCurrency(reportData.projections.next3Months?.expectedExpenses || 0)}</div>
+                <div class="metric-label">Expected 3M Expenses</div>
+              </div>
+            </div>
+          </div>
+          ` : ''}
+        `;
+        
+      case 'summary':
+        return `
+          <div class="section">
+            <div class="section-title">Executive Summary</div>
+            ${reportData.executiveSummary ? `
+              <div class="insight-item">
+                <div class="insight-title">Financial Overview</div>
+                <div>${reportData.executiveSummary.overview}</div>
+                <div style="margin-top: 10px;"><strong>Health Score:</strong> ${reportData.executiveSummary.healthScore?.score || 'N/A'}/100 (${reportData.executiveSummary.healthScore?.rating || 'N/A'})</div>
+              </div>
+            ` : ''}
+          </div>
+          
+          ${reportData.keyMetrics ? `
+          <div class="section">
+            <div class="section-title">Key Performance Metrics</div>
+            <div class="metric-grid">
+              <div class="metric-card">
+                <div class="metric-value">${reportData.keyMetrics.liquidityRatio?.toFixed(2) || 'N/A'}</div>
+                <div class="metric-label">Liquidity Ratio</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value">${reportData.keyMetrics.savingsRate?.toFixed(1) || 'N/A'}%</div>
+                <div class="metric-label">Savings Rate</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value">${reportData.keyMetrics.expenseRatio?.toFixed(1) || 'N/A'}%</div>
+                <div class="metric-label">Expense Ratio</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value">${reportData.keyMetrics.transactionVelocity?.toFixed(1) || 'N/A'}</div>
+                <div class="metric-label">Daily Transaction Rate</div>
+              </div>
+            </div>
+          </div>
+          ` : ''}
+          
+          ${reportData.highlights ? `
+          <div class="section">
+            <div class="section-title">Financial Highlights</div>
+            ${reportData.highlights.map((highlight: any) => `
+              <div class="highlight-card">
+                <div class="highlight-title">${highlight.title}</div>
+                <div class="highlight-value">${highlight.value}</div>
+                <div style="font-size: 14px; opacity: 0.9;">${highlight.description}</div>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+          
+          ${reportData.executiveSummary?.keyFindings ? `
+          <div class="section">
+            <div class="section-title">Key Findings</div>
+            ${reportData.executiveSummary.keyFindings.map((finding: string) => `
+              <div style="background: #f8f9fa; padding: 10px; margin-bottom: 8px; border-left: 4px solid #007bff; border-radius: 4px;">
+                ${finding}
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+        `;
+        
+      default:
+        return `
+          <div class="section">
+            <div class="section-title">Summary</div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Total Transactions</div>
+                <div class="summary-value">${reportData.statistics.totalTransactions}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Credit</div>
+                <div class="summary-value credit">${formatCurrency(reportData.statistics.totalCredit)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Debit</div>
+                <div class="summary-value debit">${formatCurrency(reportData.statistics.totalDebit)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Net Balance</div>
+                <div class="summary-value ${reportData.statistics.balance >= 0 ? 'credit' : 'debit'}">${formatCurrency(reportData.statistics.balance)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+    }
   };
 
   const generateChartsHTML = (reportData: any) => {
@@ -728,16 +1435,20 @@ const DownloadReport: React.FC = () => {
 
   const generateHTMLForPDF = (reportData: any) => {
     const includeCharts = reportData.config?.includeCharts || false;
+    const reportType = reportData.reportType || 'transactions';
     
     // Generate chart data if charts are enabled
     const chartHtml = includeCharts ? generateChartsHTML(reportData) : '';
+    
+    // Generate type-specific content
+    const typeSpecificContent = generateTypeSpecificContent(reportData);
     
     return `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Financial Report</title>
+    <title>${reportData.title || 'Financial Report'}</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { 
@@ -791,6 +1502,71 @@ const DownloadReport: React.FC = () => {
         .summary-value { 
             font-size: 16px; 
             color: #007bff;
+        }
+        .insight-item {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .insight-title {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 5px;
+        }
+        .recommendation-item {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .recommendation-title {
+            font-weight: bold;
+            color: #0c5460;
+            margin-bottom: 5px;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        .highlight-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .highlight-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .highlight-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
         }
         .transaction-table { 
             width: 100%; 
@@ -884,7 +1660,8 @@ const DownloadReport: React.FC = () => {
 </head>
 <body>
     <div class="header">
-        <div class="title">Financial Report</div>
+        <div class="title">${reportData.title || 'Financial Report'}</div>
+        <div class="subtitle">${reportData.subtitle || ''}</div>
         <div class="subtitle">Generated on ${new Date(reportData.generatedAt).toLocaleDateString()}</div>
         <div class="subtitle">User: ${reportData.user?.fullName || 'Unknown'} (${reportData.user?.email || 'Unknown'})</div>
         ${includeCharts ? '<div class="subtitle">📊 Including Charts and Visual Analysis</div>' : ''}
@@ -893,6 +1670,7 @@ const DownloadReport: React.FC = () => {
     <div class="section">
         <div class="section-title">Applied Filters</div>
         <div class="filter-info">
+            <div class="filter-item"><strong>Report Type:</strong> ${reportType.toUpperCase()}</div>
             <div class="filter-item"><strong>Date Range:</strong> ${reportData.filters.dateRange}</div>
             ${reportData.filters.startDate && reportData.filters.endDate ? 
                 `<div class="filter-item"><strong>Custom Dates:</strong> ${reportData.filters.startDate} to ${reportData.filters.endDate}</div>` : ''}
@@ -905,37 +1683,10 @@ const DownloadReport: React.FC = () => {
         </div>
     </div>
 
-    <div class="section">
-        <div class="section-title">Summary</div>
-        <div class="summary-grid">
-            <div class="summary-item">
-                <div class="summary-label">Total Transactions</div>
-                <div class="summary-value">${reportData.statistics.totalTransactions}</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-label">Total Credit</div>
-                <div class="summary-value credit">${formatCurrency(reportData.statistics.totalCredit)}</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-label">Total Debit</div>
-                <div class="summary-value debit">${formatCurrency(reportData.statistics.totalDebit)}</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-label">Net Balance</div>
-                <div class="summary-value ${reportData.statistics.balance >= 0 ? 'credit' : 'debit'}">${formatCurrency(reportData.statistics.balance)}</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-label">Average Transaction</div>
-                <div class="summary-value">${formatCurrency(reportData.statistics.averageTransaction)}</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-label">Credit vs Debit</div>
-                <div class="summary-value">${reportData.statistics.creditTransactions} : ${reportData.statistics.debitTransactions}</div>
-            </div>
-        </div>
-    </div>
-
+    ${typeSpecificContent}
     ${chartHtml}
+
+    ${reportType === 'transactions' || reportType === 'budget' ? `
     <div class="section">
         <div class="section-title">Transaction Details</div>
         <table class="transaction-table">
@@ -963,6 +1714,7 @@ const DownloadReport: React.FC = () => {
             </tbody>
         </table>
     </div>
+    ` : ''}
 
     <script>
         // Auto-print when ready
@@ -1069,6 +1821,70 @@ const DownloadReport: React.FC = () => {
           </p>
         </div>
 
+        {/* Tab Navigation */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginBottom: '32px'
+        }}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '16px',
+            padding: '8px',
+            display: 'flex',
+            gap: '8px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
+          }}>
+            <button
+              onClick={() => setActiveTab('generate')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                background: activeTab === 'generate' 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                  : 'transparent',
+                color: activeTab === 'generate' ? '#ffffff' : '#667eea',
+                fontWeight: '600',
+                fontSize: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <FileText style={{ height: '18px', width: '18px' }} />
+              Generate Report
+            </button>
+            <button
+              onClick={() => setActiveTab('recent')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                background: activeTab === 'recent' 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                  : 'transparent',
+                color: activeTab === 'recent' ? '#ffffff' : '#667eea',
+                fontWeight: '600',
+                fontSize: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <TrendingUp style={{ height: '18px', width: '18px' }} />
+              Recent Reports ({recentReports.length})
+            </button>
+          </div>
+        </div>
+
+        {activeTab === 'generate' ? (
+        <>
         <div style={{
           display: 'grid',
           gridTemplateColumns: window.innerWidth >= 1024 ? '2fr 1fr' : '1fr',
@@ -2261,143 +3077,436 @@ const DownloadReport: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Transaction Preview */}
-        {filteredTransactions.length > 0 && (
-          <div style={{
-            marginTop: '48px',
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '24px',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            padding: '32px'
+        </>
+        ) : (
+        <>
+        {/* Recent Reports Tab */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '24px',
+          boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          padding: '32px'
+        }}>
+          <h3 style={{
+            fontSize: '24px',
+            fontWeight: '700',
+            color: '#1a202c',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center'
           }}>
-            <h3 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#1a202c',
-              marginBottom: '24px'
+            <TrendingUp style={{ height: '24px', width: '24px', marginRight: '12px', color: '#667eea' }} />
+            Recent Reports ({recentReports.length})
+          </h3>
+          
+          {recentReports.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '64px 32px',
+              color: '#64748b'
             }}>
-              Transaction Preview ({filteredTransactions.length} transactions)
-            </h3>
+              <FileText style={{
+                height: '64px',
+                width: '64px',
+                color: '#cbd5e1',
+                margin: '0 auto 24px'
+              }} />
+              <h4 style={{
+                fontSize: '20px',
+                fontWeight: '600',
+                marginBottom: '12px',
+                color: '#64748b'
+              }}>No Recent Reports</h4>
+              <p style={{ fontSize: '16px', lineHeight: '1.6' }}>
+                You haven't generated any reports yet. Use the "Generate Report" tab to create your first report.
+              </p>
+            </div>
+          ) : (
             <div style={{
               maxHeight: '400px',
               overflowY: 'auto',
               paddingRight: '8px'
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {filteredTransactions.slice(0, 10).map((transaction, index) => (
-                  <div key={transaction.id} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '20px',
-                    background: 'linear-gradient(135deg, #f8f9ff 0%, #f1f5f9 100%)',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(226, 232, 240, 0.6)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #f8f9ff 0%, #f1f5f9 100%)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}>
+                {recentReports.map((report) => (
+                  <div 
+                    key={report.id} 
+                    onClick={() => previewReportHandler(report)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '20px',
+                      background: 'linear-gradient(135deg, #f8f9ff 0%, #f1f5f9 100%)',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(226, 232, 240, 0.6)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #f8f9ff 0%, #f1f5f9 100%)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
                     <div style={{ flex: 1 }}>
                       <div style={{
-                        fontWeight: '600',
-                        fontSize: '16px',
-                        color: '#1a202c',
-                        marginBottom: '6px'
-                      }}>{transaction.description}</div>
-                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <span style={{
+                          fontSize: '18px',
+                          fontWeight: '700',
+                          color: '#1a202c',
+                          marginRight: '12px'
+                        }}>
+                          {report.title}
+                        </span>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: getTypeColor(report.type),
+                          background: `${getTypeColor(report.type)}20`,
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          textTransform: 'uppercase'
+                        }}>
+                          {report.type}
+                        </span>
+                      </div>
+                      <p style={{
                         fontSize: '14px',
-                        color: '#64748b'
-                      }}>
-                        {new Date(transaction.date).toLocaleDateString()} • {transaction.frequency}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{
-                        fontWeight: '700',
-                        fontSize: '18px',
-                        color: transaction.type === 'credit' ? '#10b981' : '#ef4444',
-                        marginBottom: '4px'
-                      }}>
-                        {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                      </div>
-                      <div style={{
-                        fontSize: '12px',
                         color: '#64748b',
-                        textTransform: 'uppercase',
-                        fontWeight: '600',
-                        background: transaction.type === 'credit' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                        padding: '4px 8px',
-                        borderRadius: '8px',
-                        display: 'inline-block'
-                      }}>{transaction.type}</div>
+                        lineHeight: '1.5'
+                      }}>
+                        Generated on {new Date(report.generatedAt).toLocaleDateString()} at {new Date(report.generatedAt).toLocaleTimeString()}
+                      </p>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteRecentReport(report.id);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        fontSize: '18px',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      🗑️
+                    </button>
                   </div>
                 ))}
-                {filteredTransactions.length > 10 && (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '20px',
+              </div>
+            </div>
+          )}
+        </div>
+        </>
+        )}
+
+        {/* Preview Modal */}
+        {showPreview && previewReport && (
+          <div style={{
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            right: '0',
+            bottom: '0',
+            background: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.2)',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              {/* Preview Header */}
+              <div style={{
+                padding: '24px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: '700',
+                  color: '#1a202c',
+                  margin: '0'
+                }}>
+                  Report Preview: {previewReport?.title}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowPreview(false);
+                    setPreviewReport(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '24px',
                     color: '#64748b',
-                    fontSize: '16px',
-                    fontWeight: '500',
-                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
-                    borderRadius: '16px',
-                    border: '2px dashed rgba(102, 126, 234, 0.2)'
-                  }}>
-                    ... and {filteredTransactions.length - 10} more transactions
-                  </div>
-                )}
+                    cursor: 'pointer',
+                    padding: '8px'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              {/* Preview Content */}
+              <div style={{ padding: '24px' }}>
+                <div dangerouslySetInnerHTML={{
+                  __html: generateHTMLForPDF(previewReport?.reportData).replace(
+                    /<script>[\s\S]*?<\/script>/g, ''
+                  ).replace(
+                    /window\.onload.*?;/g, ''
+                  )
+                }} />
+              </div>
+              
+              {/* Preview Actions */}
+              <div style={{
+                padding: '24px',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={() => {
+                    setShowPreview(false);
+                    setPreviewReport(null);
+                  }}
+                  style={{
+                    background: '#f8f9fa',
+                    color: '#495057',
+                    border: '1px solid #dee2e6',
+                    padding: '12px 24px',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    if (previewReport) {
+                      downloadExistingReport(previewReport);
+                      setShowPreview(false);
+                      setPreviewReport(null);
+                    }
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Download style={{ height: '16px', width: '16px' }} />
+                  Download
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {filteredTransactions.length === 0 && !loading && (
+        {/* Filtered Transactions Preview - Full Width */}
+        {filteredTransactions.length > 0 && (
           <div style={{
-            marginTop: '48px',
+            width: '100%',
             background: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(20px)',
             borderRadius: '24px',
             boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
             border: '1px solid rgba(255,255,255,0.3)',
-            padding: '64px',
-            textAlign: 'center'
+            padding: '32px',
+            marginTop: '32px'
           }}>
-            <FileText style={{
-              height: '80px',
-              width: '80px',
-              color: '#9ca3af',
-              margin: '0 auto 24px'
-            }} />
-            <h3 style={{
-              fontSize: '28px',
-              fontWeight: '700',
-              color: '#64748b',
-              marginBottom: '12px'
-            }}>No Transactions Found</h3>
-            <p style={{
-              fontSize: '18px',
-              color: '#64748b',
-              lineHeight: '1.6',
-              maxWidth: '500px',
-              margin: '0 auto'
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
             }}>
-              No transactions match your current filter criteria. Try adjusting your filters or date range to see more results.
-            </p>
+              <h3 style={{
+                fontSize: '28px',
+                fontWeight: '700',
+                color: '#1a202c',
+                margin: '0'
+              }}>Filtered Transactions Preview</h3>
+              <span style={{
+                fontSize: '16px',
+                color: '#64748b',
+                background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                padding: '8px 16px',
+                borderRadius: '12px',
+                fontWeight: '600'
+              }}>
+                {filteredTransactions.length} transactions
+              </span>
+            </div>
+            
+            <div style={{
+              maxHeight: '500px',
+              overflowY: 'auto',
+              border: '1px solid rgba(226, 232, 240, 0.5)',
+              borderRadius: '16px'
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1.5fr 3fr 1fr 1fr 1.5fr',
+                gap: '20px',
+                padding: '20px 24px',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                borderBottom: '1px solid rgba(226, 232, 240, 0.5)',
+                fontSize: '14px',
+                fontWeight: '700',
+                color: '#64748b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                <div>Date</div>
+                <div>Description</div>
+                <div>Type</div>
+                <div>Frequency</div>
+                <div style={{ textAlign: 'right' }}>Amount</div>
+              </div>
+              
+              {filteredTransactions.slice(0, 15).map((transaction, index) => (
+                <div
+                  key={transaction.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.5fr 3fr 1fr 1fr 1.5fr',
+                    gap: '20px',
+                    padding: '20px 24px',
+                    borderBottom: index < Math.min(filteredTransactions.length - 1, 14) ? '1px solid rgba(226, 232, 240, 0.3)' : 'none',
+                    background: index % 2 === 0 ? '#ffffff' : 'rgba(248, 250, 252, 0.5)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = index % 2 === 0 ? '#ffffff' : 'rgba(248, 250, 252, 0.5)';
+                  }}
+                >
+                  <div style={{
+                    fontSize: '15px',
+                    color: '#1a202c',
+                    fontWeight: '600'
+                  }}>
+                    {new Date(transaction.date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <div style={{
+                    fontSize: '15px',
+                    color: '#1a202c',
+                    fontWeight: '500',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {transaction.description}
+                  </div>
+                  <div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      padding: '6px 12px',
+                      borderRadius: '10px',
+                      background: transaction.type === 'credit' 
+                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%)' 
+                        : 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                      color: transaction.type === 'credit' ? '#10b981' : '#ef4444',
+                      border: `1px solid ${transaction.type === 'credit' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                    }}>
+                      {transaction.type.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      padding: '6px 12px',
+                      borderRadius: '10px',
+                      background: transaction.frequency === 'regular' 
+                        ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)' 
+                        : 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
+                      color: transaction.frequency === 'regular' ? '#3b82f6' : '#f59e0b',
+                      border: `1px solid ${transaction.frequency === 'regular' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
+                    }}>
+                      {transaction.frequency.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    textAlign: 'right',
+                    color: transaction.type === 'credit' ? '#10b981' : '#ef4444'
+                  }}>
+                    {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                  </div>
+                </div>
+              ))}
+              
+              {filteredTransactions.length > 15 && (
+                <div style={{
+                  padding: '20px 24px',
+                  textAlign: 'center',
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                  borderTop: '1px solid rgba(226, 232, 240, 0.5)',
+                  color: '#64748b',
+                  fontSize: '16px',
+                  fontWeight: '600'
+                }}>
+                  ... and {filteredTransactions.length - 15} more transactions will be included in the report
+                </div>
+              )}
+            </div>
           </div>
         )}
-      </div>
 
       {/* Add CSS animation for spin */}
       <style dangerouslySetInnerHTML={{
@@ -2408,6 +3517,7 @@ const DownloadReport: React.FC = () => {
           }
         `
       }} />
+      </div>
     </div>
   );
 };
