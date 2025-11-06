@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Bell, CheckCircle, AlertCircle, Info, X, Filter, Plus, Calendar, 
   DollarSign, TrendingUp, Target, Clock, Edit, Trash2, Save, AlertTriangle,
-  PiggyBank, CreditCard, HandCoins, Wallet
+  PiggyBank, CreditCard, HandCoins, Wallet, CalendarCheck
 } from 'lucide-react';
 
 interface UserType {
@@ -69,7 +69,7 @@ const Notifications: React.FC = () => {
   const [savingsTargets, setSavingsTargets] = useState<SavingsTarget[]>([]);
   
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
-  const [activeTab, setActiveTab] = useState<'notifications' | 'reminders' | 'budget' | 'savings'>('notifications');
+  const [activeTab, setActiveTab] = useState<'notifications' | 'today' | 'reminders' | 'budget' | 'savings'>('today');
   
   // Form states
   const [showReminderForm, setShowReminderForm] = useState(false);
@@ -559,6 +559,10 @@ const Notifications: React.FC = () => {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const currentBudget = budgetLimits.find(b => b.isActive && b.month === currentMonth);
   const currentTarget = savingsTargets.find(t => t.isActive && t.month === currentMonth);
+  
+  // Get today's reminders count
+  const today = new Date().toISOString().split('T')[0];
+  const todayRemindersCount = reminders.filter(r => r.date === today && !r.isCompleted).length;
 
   return (
     <div style={{
@@ -644,8 +648,9 @@ const Notifications: React.FC = () => {
             boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
           }}>
             {[
-              { id: 'notifications' as const, label: 'Notifications', icon: Bell },
-              { id: 'reminders' as const, label: 'Reminders', icon: Clock },
+              { id: 'notifications' as const, label: 'Notifications', icon: Bell, count: unreadCount },
+              { id: 'today' as const, label: 'Today\'s Reminders', icon: CalendarCheck, count: todayRemindersCount },
+              { id: 'reminders' as const, label: 'All Reminders', icon: Clock, count: reminders.length },
               { id: 'budget' as const, label: 'Budget', icon: Wallet },
               { id: 'savings' as const, label: 'Savings', icon: PiggyBank }
             ].map((tab) => {
@@ -673,6 +678,21 @@ const Notifications: React.FC = () => {
                 >
                   <Icon style={{ height: '18px', width: '18px' }} />
                   {tab.label}
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <span style={{
+                      background: activeTab === tab.id ? 'rgba(255,255,255,0.3)' : '#ef4444',
+                      color: activeTab === tab.id ? '#ffffff' : '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      marginLeft: '4px',
+                      minWidth: '18px',
+                      textAlign: 'center'
+                    }}>
+                      {tab.count}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -857,7 +877,271 @@ const Notifications: React.FC = () => {
           </div>
         )}
 
-        {/* Reminders Tab */}
+        {/* Today's Reminders Tab */}
+        {activeTab === 'today' && (
+          <div>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+              padding: '32px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1a202c', margin: 0 }}>
+                  Today's Reminders
+                </h2>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  borderRadius: '12px',
+                  border: '1px solid #0ea5e9'
+                }}>
+                  <CalendarCheck style={{ height: '16px', width: '16px', color: '#0c4a6e' }} />
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#0c4a6e' }}>
+                    {new Date().toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Today's Reminders List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {(() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  const todayReminders = reminders.filter(r => r.date === today);
+                  
+                  if (todayReminders.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '48px 32px', color: '#64748b' }}>
+                        <CalendarCheck style={{ height: '64px', width: '64px', color: '#cbd5e1', margin: '0 auto 24px' }} />
+                        <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>
+                          No Reminders for Today
+                        </h3>
+                        <p style={{ fontSize: '16px', marginBottom: '24px' }}>
+                          You're all caught up! No payment reminders are due today.
+                        </p>
+                        <button
+                          onClick={() => setActiveTab('reminders')}
+                          style={{
+                            padding: '12px 24px',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            margin: '0 auto'
+                          }}
+                        >
+                          <Plus style={{ height: '18px', width: '18px' }} />
+                          Add New Reminder
+                        </button>
+                      </div>
+                    );
+                  }
+                  
+                  return todayReminders.map((reminder) => (
+                    <div
+                      key={reminder.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '20px',
+                        background: reminder.isCompleted 
+                          ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' 
+                          : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                        border: reminder.isCompleted 
+                          ? '2px solid #16a34a' 
+                          : '2px solid #f59e0b',
+                        borderRadius: '16px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        opacity: reminder.isCompleted ? 0.7 : 1,
+                        transform: reminder.isCompleted ? 'scale(0.98)' : 'scale(1)',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+                        <div style={{
+                          padding: '12px',
+                          background: reminder.type === 'collect' 
+                            ? (reminder.isCompleted ? '#dcfce7' : '#ecfdf5')
+                            : (reminder.isCompleted ? '#fef3c7' : '#fefce8'),
+                          borderRadius: '12px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          {reminder.type === 'collect' ? 
+                            <HandCoins style={{ height: '24px', width: '24px', color: '#16a34a' }} /> :
+                            <CreditCard style={{ height: '24px', width: '24px', color: '#ca8a04' }} />
+                          }
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{
+                            fontSize: '18px',
+                            fontWeight: '700',
+                            color: '#1a202c',
+                            margin: '0 0 6px 0',
+                            textDecoration: reminder.isCompleted ? 'line-through' : 'none'
+                          }}>
+                            {reminder.description}
+                          </h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                            <p style={{ 
+                              fontSize: '16px', 
+                              fontWeight: '700',
+                              color: reminder.type === 'collect' ? '#16a34a' : '#ca8a04',
+                              margin: 0,
+                              padding: '4px 12px',
+                              background: reminder.type === 'collect' ? '#f0fdf4' : '#fefce8',
+                              borderRadius: '8px',
+                              border: `1px solid ${reminder.type === 'collect' ? '#16a34a' : '#ca8a04'}`
+                            }}>
+                              {formatCurrency(reminder.amount)}
+                            </p>
+                            <p style={{ 
+                              fontSize: '14px', 
+                              color: '#64748b', 
+                              margin: 0,
+                              padding: '4px 8px',
+                              background: 'rgba(255,255,255,0.7)',
+                              borderRadius: '6px'
+                            }}>
+                              {reminder.type === 'collect' ? 'TO COLLECT' : 'TO PAY'}
+                            </p>
+                            {reminder.isCompleted && (
+                              <p style={{ 
+                                fontSize: '12px', 
+                                color: '#16a34a', 
+                                margin: 0,
+                                padding: '4px 8px',
+                                background: '#f0fdf4',
+                                borderRadius: '6px',
+                                fontWeight: '600',
+                                border: '1px solid #16a34a'
+                              }}>
+                                ✓ COMPLETED
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button
+                          onClick={() => toggleReminderComplete(reminder.id)}
+                          style={{
+                            padding: '10px 16px',
+                            background: reminder.isCompleted 
+                              ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                              : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          {reminder.isCompleted ? 'Undo' : 'Complete'}
+                        </button>
+                        <button
+                          onClick={() => deleteReminder(reminder.id)}
+                          style={{
+                            padding: '10px',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: '#dc2626',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fef2f2';
+                            e.currentTarget.style.borderColor = '#dc2626';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                          }}
+                        >
+                          <Trash2 style={{ height: '16px', width: '16px' }} />
+                        </button>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              {/* Quick Add Reminder for Today */}
+              <div style={{
+                marginTop: '24px',
+                padding: '20px',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#1a202c', marginBottom: '16px' }}>
+                  Quick Actions
+                </h3>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setActiveTab('reminders')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 16px',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <Plus style={{ height: '16px', width: '16px' }} />
+                    Add New Reminder
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('reminders')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 16px',
+                      background: '#f3f4f6',
+                      color: '#374151',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <Clock style={{ height: '16px', width: '16px' }} />
+                    View All Reminders
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* All Reminders Tab */}
         {activeTab === 'reminders' && (
           <div>
             {/* Add Reminder Section */}
@@ -871,7 +1155,7 @@ const Notifications: React.FC = () => {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1a202c', margin: 0 }}>
-                  Payment Reminders
+                  All Payment Reminders
                 </h2>
                 <button
                   onClick={() => setShowReminderForm(!showReminderForm)}
