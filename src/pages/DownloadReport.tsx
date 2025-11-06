@@ -2955,125 +2955,148 @@ const DownloadReport: React.FC = () => {
                 fontWeight: '700',
                 color: '#1a202c',
                 marginBottom: '24px'
-              }}>Recent Reports</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              }}>Recent Reports ({recentReports.length})</h3>
+              
+              {recentReports.length === 0 ? (
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 0',
-                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                  textAlign: 'center',
+                  padding: '32px',
+                  color: '#64748b'
                 }}>
-                  <div>
-                    <div style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#1a202c',
-                      marginBottom: '4px'
-                    }}>Transaction Report</div>
-                    <div style={{
-                      fontSize: '14px',
-                      color: '#64748b'
-                    }}>Yesterday - 142 transactions</div>
-                  </div>
-                  <button style={{
-                    color: '#667eea',
-                    fontSize: '14px',
+                  <FileText style={{
+                    height: '48px',
+                    width: '48px',
+                    color: '#cbd5e1',
+                    margin: '0 auto 16px'
+                  }} />
+                  <div style={{
+                    fontSize: '16px',
                     fontWeight: '600',
-                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)';
-                  }}>
-                    Download
-                  </button>
+                    marginBottom: '8px'
+                  }}>No Recent Reports</div>
+                  <div style={{
+                    fontSize: '14px'
+                  }}>Generate your first report to see it here</div>
                 </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 0',
-                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
-                }}>
-                  <div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {recentReports.slice(0, 3).map((report, index) => (
+                    <div
+                      key={report.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px 0',
+                        borderBottom: index < Math.min(recentReports.length - 1, 2) ? '1px solid rgba(226, 232, 240, 0.5)' : 'none'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          color: '#1a202c',
+                          marginBottom: '4px'
+                        }}>
+                          {report.title}
+                        </div>
+                        <div style={{
+                          fontSize: '14px',
+                          color: '#64748b',
+                          marginBottom: '4px'
+                        }}>
+                          {new Date(report.generatedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })} - {report.dataSnapshot.totalTransactions} transactions
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#94a3b8'
+                        }}>
+                          {report.type.toUpperCase()} • {report.format.toUpperCase()} • {report.size}
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        gap: '8px',
+                        marginLeft: '16px'
+                      }}>
+                        <button
+                          onClick={() => previewReportHandler(report)}
+                          style={{
+                            color: '#667eea',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)';
+                          }}
+                        >
+                          Preview
+                        </button>
+                        <button
+                          onClick={() => downloadExistingReport(report)}
+                          style={{
+                            color: '#10b981',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.2) 100%)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)';
+                          }}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {recentReports.length > 3 && (
                     <div style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#1a202c',
-                      marginBottom: '4px'
-                    }}>Monthly Summary</div>
-                    <div style={{
-                      fontSize: '14px',
-                      color: '#64748b'
-                    }}>1 week ago - Full month</div>
-                  </div>
-                  <button style={{
-                    color: '#667eea',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)';
-                  }}>
-                    Download
-                  </button>
+                      textAlign: 'center',
+                      padding: '16px 0',
+                      borderTop: '1px solid rgba(226, 232, 240, 0.5)',
+                      marginTop: '8px'
+                    }}>
+                      <button
+                        onClick={() => setActiveTab('recent')}
+                        style={{
+                          color: '#667eea',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        View All {recentReports.length} Reports →
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 0'
-                }}>
-                  <div>
-                    <div style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#1a202c',
-                      marginBottom: '4px'
-                    }}>Budget Analysis</div>
-                    <div style={{
-                      fontSize: '14px',
-                      color: '#64748b'
-                    }}>2 weeks ago - Q3 data</div>
-                  </div>
-                  <button style={{
-                    color: '#667eea',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)';
-                  }}>
-                    Download
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
