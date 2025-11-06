@@ -3077,6 +3077,166 @@ const DownloadReport: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Filtered Transactions Preview - Full Width */}
+        {filteredTransactions.length > 0 && (
+          <div style={{
+            width: '100%',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '24px',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            padding: '32px',
+            marginTop: '32px'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <h3 style={{
+                fontSize: '28px',
+                fontWeight: '700',
+                color: '#1a202c',
+                margin: '0'
+              }}>Filtered Transactions Preview</h3>
+              <span style={{
+                fontSize: '16px',
+                color: '#64748b',
+                background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                padding: '8px 16px',
+                borderRadius: '12px',
+                fontWeight: '600'
+              }}>
+                {filteredTransactions.length} transactions
+              </span>
+            </div>
+            
+            <div style={{
+              maxHeight: '500px',
+              overflowY: 'auto',
+              border: '1px solid rgba(226, 232, 240, 0.5)',
+              borderRadius: '16px'
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1.5fr 3fr 1fr 1fr 1.5fr',
+                gap: '20px',
+                padding: '20px 24px',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                borderBottom: '1px solid rgba(226, 232, 240, 0.5)',
+                fontSize: '14px',
+                fontWeight: '700',
+                color: '#64748b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                <div>Date</div>
+                <div>Description</div>
+                <div>Type</div>
+                <div>Frequency</div>
+                <div style={{ textAlign: 'right' }}>Amount</div>
+              </div>
+              
+              {filteredTransactions.slice(0, 15).map((transaction, index) => (
+                <div
+                  key={transaction.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.5fr 3fr 1fr 1fr 1.5fr',
+                    gap: '20px',
+                    padding: '20px 24px',
+                    borderBottom: index < Math.min(filteredTransactions.length - 1, 14) ? '1px solid rgba(226, 232, 240, 0.3)' : 'none',
+                    background: index % 2 === 0 ? '#ffffff' : 'rgba(248, 250, 252, 0.5)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = index % 2 === 0 ? '#ffffff' : 'rgba(248, 250, 252, 0.5)';
+                  }}
+                >
+                  <div style={{
+                    fontSize: '15px',
+                    color: '#1a202c',
+                    fontWeight: '600'
+                  }}>
+                    {new Date(transaction.date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <div style={{
+                    fontSize: '15px',
+                    color: '#1a202c',
+                    fontWeight: '500',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {transaction.description}
+                  </div>
+                  <div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      padding: '6px 12px',
+                      borderRadius: '10px',
+                      background: transaction.type === 'credit' 
+                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%)' 
+                        : 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                      color: transaction.type === 'credit' ? '#10b981' : '#ef4444',
+                      border: `1px solid ${transaction.type === 'credit' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                    }}>
+                      {transaction.type.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      padding: '6px 12px',
+                      borderRadius: '10px',
+                      background: transaction.frequency === 'regular' 
+                        ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)' 
+                        : 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
+                      color: transaction.frequency === 'regular' ? '#3b82f6' : '#f59e0b',
+                      border: `1px solid ${transaction.frequency === 'regular' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
+                    }}>
+                      {transaction.frequency.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    textAlign: 'right',
+                    color: transaction.type === 'credit' ? '#10b981' : '#ef4444'
+                  }}>
+                    {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                  </div>
+                </div>
+              ))}
+              
+              {filteredTransactions.length > 15 && (
+                <div style={{
+                  padding: '20px 24px',
+                  textAlign: 'center',
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                  borderTop: '1px solid rgba(226, 232, 240, 0.5)',
+                  color: '#64748b',
+                  fontSize: '16px',
+                  fontWeight: '600'
+                }}>
+                  ... and {filteredTransactions.length - 15} more transactions will be included in the report
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         </>
         ) : (
         <>
@@ -3282,7 +3442,12 @@ const DownloadReport: React.FC = () => {
               </div>
               
               {/* Preview Content */}
-              <div style={{ padding: '24px' }}>
+              <div style={{ 
+                flex: 1,
+                overflow: 'auto',
+                padding: '24px',
+                maxHeight: 'calc(90vh - 160px)' // Account for header and footer
+              }}>
                 <div dangerouslySetInnerHTML={{
                   __html: generateHTMLForPDF(previewReport?.reportData).replace(
                     /<script>[\s\S]*?<\/script>/g, ''
@@ -3344,166 +3509,6 @@ const DownloadReport: React.FC = () => {
                   Download
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Filtered Transactions Preview - Full Width */}
-        {filteredTransactions.length > 0 && (
-          <div style={{
-            width: '100%',
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '24px',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            padding: '32px',
-            marginTop: '32px'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '24px'
-            }}>
-              <h3 style={{
-                fontSize: '28px',
-                fontWeight: '700',
-                color: '#1a202c',
-                margin: '0'
-              }}>Filtered Transactions Preview</h3>
-              <span style={{
-                fontSize: '16px',
-                color: '#64748b',
-                background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-                padding: '8px 16px',
-                borderRadius: '12px',
-                fontWeight: '600'
-              }}>
-                {filteredTransactions.length} transactions
-              </span>
-            </div>
-            
-            <div style={{
-              maxHeight: '500px',
-              overflowY: 'auto',
-              border: '1px solid rgba(226, 232, 240, 0.5)',
-              borderRadius: '16px'
-            }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1.5fr 3fr 1fr 1fr 1.5fr',
-                gap: '20px',
-                padding: '20px 24px',
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                borderBottom: '1px solid rgba(226, 232, 240, 0.5)',
-                fontSize: '14px',
-                fontWeight: '700',
-                color: '#64748b',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                <div>Date</div>
-                <div>Description</div>
-                <div>Type</div>
-                <div>Frequency</div>
-                <div style={{ textAlign: 'right' }}>Amount</div>
-              </div>
-              
-              {filteredTransactions.slice(0, 15).map((transaction, index) => (
-                <div
-                  key={transaction.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.5fr 3fr 1fr 1fr 1.5fr',
-                    gap: '20px',
-                    padding: '20px 24px',
-                    borderBottom: index < Math.min(filteredTransactions.length - 1, 14) ? '1px solid rgba(226, 232, 240, 0.3)' : 'none',
-                    background: index % 2 === 0 ? '#ffffff' : 'rgba(248, 250, 252, 0.5)',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = index % 2 === 0 ? '#ffffff' : 'rgba(248, 250, 252, 0.5)';
-                  }}
-                >
-                  <div style={{
-                    fontSize: '15px',
-                    color: '#1a202c',
-                    fontWeight: '600'
-                  }}>
-                    {new Date(transaction.date).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </div>
-                  <div style={{
-                    fontSize: '15px',
-                    color: '#1a202c',
-                    fontWeight: '500',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {transaction.description}
-                  </div>
-                  <div>
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      padding: '6px 12px',
-                      borderRadius: '10px',
-                      background: transaction.type === 'credit' 
-                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%)' 
-                        : 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
-                      color: transaction.type === 'credit' ? '#10b981' : '#ef4444',
-                      border: `1px solid ${transaction.type === 'credit' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
-                    }}>
-                      {transaction.type.toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      padding: '6px 12px',
-                      borderRadius: '10px',
-                      background: transaction.frequency === 'regular' 
-                        ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)' 
-                        : 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
-                      color: transaction.frequency === 'regular' ? '#3b82f6' : '#f59e0b',
-                      border: `1px solid ${transaction.frequency === 'regular' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
-                    }}>
-                      {transaction.frequency.toUpperCase()}
-                    </span>
-                  </div>
-                  <div style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    textAlign: 'right',
-                    color: transaction.type === 'credit' ? '#10b981' : '#ef4444'
-                  }}>
-                    {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
-                  </div>
-                </div>
-              ))}
-              
-              {filteredTransactions.length > 15 && (
-                <div style={{
-                  padding: '20px 24px',
-                  textAlign: 'center',
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                  borderTop: '1px solid rgba(226, 232, 240, 0.5)',
-                  color: '#64748b',
-                  fontSize: '16px',
-                  fontWeight: '600'
-                }}>
-                  ... and {filteredTransactions.length - 15} more transactions will be included in the report
-                </div>
-              )}
             </div>
           </div>
         )}
