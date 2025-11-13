@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Send, Bot, User, Sparkles, TrendingUp, PieChart, Target, Zap } from 'lucide-react';
+import { MessageCircle, Send, Bot, User, Sparkles, TrendingUp, PieChart, Target, Zap, History, Plus } from 'lucide-react';
 import { generateChatbotResponse, fetchUserTransactions } from '../services/chatbotService';
 
 interface Message {
@@ -9,6 +9,13 @@ interface Message {
   sender: 'user' | 'bot';
   timestamp: Date;
   type?: 'text' | 'suggestion';
+}
+
+interface ChatSession {
+  id: string;
+  name: string;
+  messages: Message[];
+  timestamp: Date;
 }
 
 interface UserType {
@@ -31,6 +38,9 @@ interface Transaction {
 const Chatbot: React.FC = () => {
   const [user, setUser] = useState<UserType | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [viewMode, setViewMode] = useState<'new' | 'history'>('new');
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -45,14 +55,6 @@ const Chatbot: React.FC = () => {
   const [conversationContext, setConversationContext] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   useEffect(() => {
     // Get user data and fetch transactions
@@ -104,18 +106,71 @@ const Chatbot: React.FC = () => {
     }
   }, [navigate]);
 
+  // Load chat sessions from localStorage
+  useEffect(() => {
+    const savedSessions = localStorage.getItem('chatSessions');
+    if (savedSessions) {
+      try {
+        const parsed: ChatSession[] = JSON.parse(savedSessions).map((session: any) => ({
+          ...session,
+          timestamp: new Date(session.timestamp),
+          messages: session.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+        }));
+        setChatSessions(parsed);
+      } catch (error) {
+        console.error('Error loading chat sessions:', error);
+      }
+    }
+  }, []);
+
+  // Scroll to bottom of chat (internal scroll, not page scroll)
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [messages, isTyping]);
+
   const quickQuestions = [
     "How much did I spend this month?",
-    "What are my biggest spending categories?", 
-    "How can I save more money?",
-    "Am I overspending in any area?",
-    "Show me my financial summary",
-    "What's my savings rate?"
+    "What are my spending patterns?",
+    "Can you analyze my transactions?",
+    "Give me some saving tips",
+    "What's my biggest expense category?",
+    "Help me create a budget plan"
   ];
 
   const handleQuickQuestion = (question: string) => {
-    setInputMessage(question);
     handleSendMessage(question);
+  };
+
+  const saveChatSession = (sessionMessages: Message[]) => {
+    if (sessionMessages.length > 1) {
+      const sessionId = currentSessionId || Date.now().toString();
+      const firstUserMessage = sessionMessages.find(m => m.sender === 'user');
+      const sessionName = firstUserMessage ? firstUserMessage.text.slice(0, 30) + '...' : 'New Chat';
+      
+      const session: ChatSession = {
+        id: sessionId,
+        name: sessionName,
+        messages: sessionMessages,
+        timestamp: new Date()
+      };
+      
+      setChatSessions(prev => {
+        const updated = prev.filter(s => s.id !== sessionId);
+        updated.unshift(session);
+        const final = updated.slice(0, 20); // Keep only last 20 sessions
+        localStorage.setItem('chatSessions', JSON.stringify(final));
+        return final;
+      });
+      
+      if (!currentSessionId) {
+        setCurrentSessionId(sessionId);
+      }
+    }
   };
 
   const handleSendMessage = async (customMessage?: string) => {
@@ -130,7 +185,8 @@ const Chatbot: React.FC = () => {
       type: 'text'
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
     setInputMessage('');
     setIsTyping(true);
 
@@ -156,13 +212,17 @@ const Chatbot: React.FC = () => {
         type: 'text'
       };
       
-      setMessages(prev => [...prev, botResponse]);
+      const finalMessages = [...updatedMessages, botResponse];
+      setMessages(finalMessages);
       
       // Update conversation context
       setConversationContext([
         ...newContext,
         `Assistant: ${response.response}`
       ].slice(-10)); // Keep last 10 context items
+      
+      // Save session
+      saveChatSession(finalMessages);
       
     } catch (error) {
       console.error('💥 Error getting chatbot response:', error);
@@ -175,7 +235,9 @@ const Chatbot: React.FC = () => {
         type: 'text'
       };
       
-      setMessages(prev => [...prev, errorResponse]);
+      const finalMessages = [...updatedMessages, errorResponse];
+      setMessages(finalMessages);
+      saveChatSession(finalMessages);
     } finally {
       setIsTyping(false);
     }
@@ -184,276 +246,303 @@ const Chatbot: React.FC = () => {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      e.stopPropagation();
       handleSendMessage();
     }
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e0f2fe 25%, #e8f5e8 75%, #f3e5f5 100%)',
-      padding: '2rem 1rem',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
-      {/* Hero Header */}
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        textAlign: 'center',
-        marginBottom: '3rem'
-      }}>
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '20px',
-          marginBottom: '1.5rem',
-          boxShadow: '0 20px 40px rgba(102, 126, 234, 0.3)'
-        }}>
-          <Sparkles style={{ width: '2.5rem', height: '2.5rem', color: 'white', marginRight: '0.5rem' }} />
-          <MessageCircle style={{ width: '2.5rem', height: '2.5rem', color: 'white' }} />
-        </div>
-        
-        <h1 style={{
-          fontSize: '3.5rem',
-          fontWeight: '800',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          marginBottom: '1rem',
-          lineHeight: '1.2'
-        }}>
-          AI Finance Assistant
-        </h1>
-        
-        <p style={{
-          fontSize: '1.25rem',
-          color: '#64748b',
-          maxWidth: '600px',
-          margin: '0 auto',
-          lineHeight: '1.6'
-        }}>
-          Get personalized financial advice, budget insights, and smart money management tips powered by advanced AI
-        </p>
-      </div>
+  const startNewChat = () => {
+    setMessages([
+      {
+        id: 1,
+        text: user ? `Welcome back, ${user.fullName}! 🚀 I'm your Smart Finance Assistant. What would you like to explore today?` : "Welcome to your Smart Finance Assistant! 🚀 I'm here to help you master your finances. What would you like to explore today?",
+        sender: 'bot',
+        timestamp: new Date(),
+        type: 'text'
+      }
+    ]);
+    setCurrentSessionId(null);
+    setConversationContext([]);
+    setViewMode('new');
+  };
 
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-        {/* Main Chat Container */}
+  const loadChatSession = (session: ChatSession) => {
+    setMessages(session.messages);
+    setCurrentSessionId(session.id);
+    setViewMode('new');
+  };
+
+  // History View Component
+  const HistoryView = () => (
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.95)',
+      backdropFilter: 'blur(20px)',
+      borderRadius: '24px',
+      boxShadow: '0 32px 64px rgba(0, 0, 0, 0.1)',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+      padding: '2rem',
+      margin: '2rem auto',
+      maxWidth: '1000px'
+    }}>
+      <h2 style={{
+        fontSize: '1.5rem',
+        fontWeight: '600',
+        color: '#1e293b',
+        marginBottom: '1.5rem',
+        textAlign: 'center'
+      }}>Chat History</h2>
+      
+      {chatSessions.length === 0 ? (
         <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          boxShadow: '0 32px 64px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          overflow: 'hidden',
-          marginBottom: '2rem'
+          textAlign: 'center',
+          padding: '3rem',
+          color: '#64748b'
         }}>
-          {/* Chat Header */}
-          <div style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            padding: '1.5rem',
-            color: 'white'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{
-                  width: '3rem',
-                  height: '3rem',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: '1rem'
-                }}>
-                  <Bot style={{ width: '1.5rem', height: '1.5rem' }} />
-                </div>
+          <History style={{ width: '3rem', height: '3rem', margin: '0 auto 1rem auto', opacity: 0.5 }} />
+          <p>No chat history yet. Start a new conversation to see it here!</p>
+          <button
+            onClick={startNewChat}
+            style={{
+              marginTop: '1rem',
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            Start New Chat
+          </button>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          maxHeight: '60vh',
+          overflowY: 'auto'
+        }}>
+          {chatSessions.map((session) => (
+            <div
+              key={session.id}
+              onClick={() => loadChatSession(session)}
+              style={{
+                padding: '1rem',
+                background: 'rgba(248, 250, 252, 0.8)',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                border: '1px solid rgba(0, 0, 0, 0.05)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(102, 126, 234, 0.1)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(248, 250, 252, 0.8)';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
                 <div>
-                  <h3 style={{ margin: '0', fontSize: '1.25rem', fontWeight: '600' }}>Financial Assistant</h3>
-                  <p style={{ margin: '0', fontSize: '0.875rem', opacity: '0.9' }}>Online • Ready to help</p>
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#334155',
+                    margin: 0,
+                    marginBottom: '0.25rem'
+                  }}>
+                    {session.name}
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#64748b',
+                    margin: 0
+                  }}>
+                    {session.messages.length} messages • {session.timestamp.toLocaleDateString()}
+                  </p>
                 </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  background: '#10b981',
-                  borderRadius: '50%',
-                  marginRight: '0.5rem'
-                }}></div>
-                <span style={{ fontSize: '0.875rem' }}>AI Powered</span>
+                <MessageCircle style={{ width: '1.25rem', height: '1.25rem', color: '#667eea' }} />
               </div>
             </div>
-          </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
-          {/* Messages Area */}
-          <div style={{
-            height: '500px',
-            overflowY: 'auto',
-            padding: '2rem',
-            background: 'linear-gradient(to bottom, #f8fafc, #f1f5f9)'
-          }}>
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  marginBottom: '1.5rem',
-                  flexDirection: message.sender === 'user' ? 'row-reverse' : 'row'
-                }}
-              >
-                {/* Avatar */}
-                <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: message.sender === 'user' 
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  margin: message.sender === 'user' ? '0 0 0 1rem' : '0 1rem 0 0',
-                  boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)'
-                }}>
-                  {message.sender === 'user' ? (
-                    <User style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
-                  ) : (
-                    <Bot style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
-                  )}
-                </div>
+  return (
+    <div style={{
+      height: '100vh',
+      width: '100vw',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e0f2fe 25%, #e8f5e8 75%, #f3e5f5 100%)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      {/* Header with Toggle Buttons */}
+      <div style={{
+        padding: '1rem',
+        background: 'rgba(255, 255, 255, 0.9)',
+        borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '1rem',
+        zIndex: 10
+      }}>
+        <button
+          onClick={startNewChat}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '12px',
+            border: 'none',
+            cursor: 'pointer',
+            fontWeight: '600',
+            transition: 'all 0.2s ease',
+            background: viewMode === 'new' 
+              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              : 'rgba(255, 255, 255, 0.8)',
+            color: viewMode === 'new' ? 'white' : '#64748b',
+            boxShadow: viewMode === 'new' ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none'
+          }}
+        >
+          <Plus style={{ width: '1rem', height: '1rem' }} />
+          New Chat
+        </button>
+        <button
+          onClick={() => setViewMode('history')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '12px',
+            border: 'none',
+            cursor: 'pointer',
+            fontWeight: '600',
+            transition: 'all 0.2s ease',
+            background: viewMode === 'history' 
+              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              : 'rgba(255, 255, 255, 0.8)',
+            color: viewMode === 'history' ? 'white' : '#64748b',
+            boxShadow: viewMode === 'history' ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none'
+          }}
+        >
+          <History style={{ width: '1rem', height: '1rem' }} />
+          Chat History ({chatSessions.length})
+        </button>
+      </div>
 
-                {/* Message Bubble */}
-                <div style={{
-                  maxWidth: '70%',
-                  padding: '1rem 1.5rem',
-                  borderRadius: message.sender === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                  background: message.sender === 'user'
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                    : 'white',
-                  color: message.sender === 'user' ? 'white' : '#1f2937',
-                  boxShadow: message.sender === 'user' 
-                    ? '0 12px 24px rgba(102, 126, 234, 0.3)'
-                    : '0 8px 16px rgba(0, 0, 0, 0.1)',
-                  border: message.sender === 'bot' ? '1px solid rgba(0, 0, 0, 0.05)' : 'none'
-                }}>
-                  <p style={{ 
-                    margin: '0 0 0.5rem 0', 
-                    fontSize: '1rem', 
-                    lineHeight: '1.5',
-                    fontWeight: message.sender === 'user' ? '500' : '400'
-                  }}>
-                    {message.text}
-                  </p>
-                  <span style={{
-                    fontSize: '0.75rem',
-                    opacity: message.sender === 'user' ? '0.8' : '0.6',
-                    color: message.sender === 'user' ? 'rgba(255, 255, 255, 0.8)' : '#6b7280'
-                  }}>
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              </div>
-            ))}
-            
-            {/* Typing Indicator */}
-            {isTyping && (
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-                <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  marginRight: '1rem'
-                }}>
-                  <Bot style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
-                </div>
-                <div style={{
-                  background: 'white',
-                  padding: '1rem 1.5rem',
-                  borderRadius: '20px 20px 20px 4px',
-                  boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      background: '#9ca3af',
-                      borderRadius: '50%',
-                      marginRight: '4px',
-                      animation: 'pulse 1.4s infinite'
-                    }}></div>
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      background: '#9ca3af',
-                      borderRadius: '50%',
-                      marginRight: '4px',
-                      animation: 'pulse 1.4s infinite 0.2s'
-                    }}></div>
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      background: '#9ca3af',
-                      borderRadius: '50%',
-                      animation: 'pulse 1.4s infinite 0.4s'
-                    }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Quick Questions */}
-          {messages.length === 1 && user && transactions.length > 0 && (
+      {/* Main Content Area */}
+      <div style={{
+        flex: 1,
+        overflow: 'auto',
+        padding: viewMode === 'history' ? '0' : '2rem 1rem'
+      }}>
+        {viewMode === 'history' ? (
+          <HistoryView />
+        ) : (
+          <>
+            {/* Hero Header */}
             <div style={{
-              padding: '0 2rem 1rem 2rem',
-              background: 'linear-gradient(to bottom, #f1f5f9, #e2e8f0)'
+              maxWidth: '1200px',
+              margin: '0 auto',
+              textAlign: 'center',
+              marginBottom: '3rem'
             }}>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#64748b',
-                marginBottom: '1rem',
-                fontWeight: '500'
-              }}>
-                💡 Here are some personalized questions based on your {transactions.length} transactions:
-              </p>
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '0.5rem'
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '24px',
+                padding: '1rem 2rem',
+                marginBottom: '2rem',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+              }}>
+                <MessageCircle style={{ width: '2rem', height: '2rem', color: '#667eea', marginRight: '0.75rem' }} />
+                <h1 style={{
+                  fontSize: '2.5rem',
+                  fontWeight: '700',
+                  margin: 0,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>AI Finance Assistant</h1>
+                <Sparkles style={{ width: '1.5rem', height: '1.5rem', color: '#fbbf24', marginLeft: '0.75rem' }} />
+              </div>
+              
+              <p style={{
+                fontSize: '1.25rem',
+                color: '#64748b',
+                maxWidth: '600px',
+                margin: '0 auto',
+                lineHeight: '1.8'
+              }}>
+                Get personalized financial insights and smart recommendations powered by advanced AI
+              </p>
+            </div>
+
+            {/* Quick Question Pills */}
+            <div style={{
+              maxWidth: '1200px',
+              margin: '0 auto 3rem auto',
+              textAlign: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '1.1rem',
+                color: '#475569',
+                marginBottom: '1.5rem',
+                fontWeight: '600'
+              }}>💡 Quick Questions</h3>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+                justifyContent: 'center'
               }}>
                 {quickQuestions.map((question, index) => (
                   <button
                     key={index}
                     onClick={() => handleQuickQuestion(question)}
                     style={{
-                      background: 'white',
+                      padding: '0.75rem 1.25rem',
+                      background: 'rgba(255, 255, 255, 0.9)',
                       border: '1px solid rgba(102, 126, 234, 0.2)',
-                      borderRadius: '12px',
-                      padding: '0.75rem 1rem',
-                      fontSize: '0.875rem',
-                      color: '#374151',
+                      borderRadius: '25px',
+                      color: '#667eea',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      textAlign: 'left'
+                      fontWeight: '500',
+                      fontSize: '0.9rem'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                      e.currentTarget.style.background = '#667eea';
                       e.currentTarget.style.color = 'white';
                       e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 16px rgba(102, 126, 234, 0.3)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'white';
-                      e.currentTarget.style.color = '#374151';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                      e.currentTarget.style.color = '#667eea';
                       e.currentTarget.style.transform = 'translateY(0)';
                       e.currentTarget.style.boxShadow = 'none';
                     }}
@@ -462,232 +551,263 @@ const Chatbot: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <div style={{
-                marginTop: '1rem',
-                padding: '0.75rem',
-                background: 'rgba(34, 197, 94, 0.1)',
-                borderRadius: '12px',
-                border: '1px solid rgba(34, 197, 94, 0.2)'
-              }}>
-                <p style={{
-                  fontSize: '0.8rem',
-                  color: '#059669',
-                  margin: '0',
-                  textAlign: 'center'
-                }}>
-                  ✨ I can analyze your {transactions.filter(t => t.type === 'debit').length} expenses and {transactions.filter(t => t.type === 'credit').length} income transactions to give you personalized financial insights!
-                </p>
-              </div>
             </div>
-          )}
 
-          {/* Loading state for new users */}
-          {!user && (
+            {/* Chat Container */}
             <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              color: '#64748b'
+              maxWidth: '900px',
+              margin: '0 auto'
             }}>
+              {/* Chat Messages */}
               <div style={{
-                display: 'inline-block',
-                width: '2rem',
-                height: '2rem',
-                border: '3px solid #e5e7eb',
-                borderTop: '3px solid #667eea',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              <p style={{ marginTop: '1rem', fontSize: '0.875rem' }}>Loading your financial data...</p>
-            </div>
-          )}
-
-          {/* Input Area */}
-          <div style={{
-            padding: '1.5rem 2rem',
-            background: 'white',
-            borderTop: '1px solid rgba(0, 0, 0, 0.05)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ flex: '1', position: 'relative' }}>
-                <textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask me anything about your finances..."
-                  style={{
-                    width: '100%',
-                    resize: 'none',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '16px',
-                    padding: '1rem 1.25rem',
-                    fontSize: '1rem',
-                    outline: 'none',
-                    transition: 'all 0.2s ease',
-                    fontFamily: 'inherit',
-                    background: '#f9fafb'
-                  }}
-                  rows={1}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#667eea';
-                    e.target.style.background = 'white';
-                    e.target.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.background = '#f9fafb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={!inputMessage.trim() || isTyping}
-                style={{
-                  background: inputMessage.trim() && !isTyping 
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                    : '#e5e7eb',
-                  color: inputMessage.trim() && !isTyping ? 'white' : '#9ca3af',
-                  border: 'none',
-                  borderRadius: '16px',
-                  padding: '1rem',
-                  cursor: inputMessage.trim() && !isTyping ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: '3.5rem',
-                  height: '3.5rem'
-                }}
-                onMouseEnter={(e) => {
-                  if (inputMessage.trim() && !isTyping) {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(102, 126, 234, 0.3)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <Send style={{ width: '1.25rem', height: '1.25rem' }} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Feature Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '1.5rem',
-          marginTop: '2rem'
-        }}>
-          {[
-            {
-              icon: TrendingUp,
-              title: 'Smart Analytics',
-              description: 'Get AI-powered insights about your spending patterns and financial trends',
-              gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-            },
-            {
-              icon: PieChart,
-              title: 'Budget Planning',
-              description: 'Create personalized budgets with intelligent recommendations',
-              gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-            },
-            {
-              icon: Target,
-              title: 'Goal Tracking',
-              description: 'Set and achieve financial goals with AI-guided planning',
-              gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
-            },
-            {
-              icon: Zap,
-              title: 'Quick Actions',
-              description: 'Instant answers to common financial questions and calculations',
-              gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-            }
-          ].map((feature, index) => (
-            <div
-              key={index}
-              style={{
-                background: 'rgba(255, 255, 255, 0.9)',
+                background: 'rgba(255, 255, 255, 0.95)',
                 backdropFilter: 'blur(20px)',
-                borderRadius: '20px',
+                borderRadius: '24px',
                 padding: '2rem',
-                textAlign: 'center',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 16px 32px rgba(0, 0, 0, 0.1)',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-8px)';
-                e.currentTarget.style.boxShadow = '0 24px 48px rgba(0, 0, 0, 0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 16px 32px rgba(0, 0, 0, 0.1)';
-              }}
-            >
-              <div style={{
-                width: '4rem',
-                height: '4rem',
-                background: feature.gradient,
+                marginBottom: '6rem',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                minHeight: '400px',
+                maxHeight: '600px',
+                overflow: 'auto',
+                position: 'relative'
+              }}>
+                {messages.map((message) => (
+                  <div key={message.id} style={{
+                    display: 'flex',
+                    justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
+                    marginBottom: '1.5rem',
+                    alignItems: 'flex-start'
+                  }}>
+                    {message.sender === 'bot' && (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        borderRadius: '50%',
+                        padding: '0.5rem',
+                        marginRight: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '2.5rem',
+                        height: '2.5rem'
+                      }}>
+                        <Bot style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                      </div>
+                    )}
+                    
+                    <div style={{
+                      maxWidth: '80%',
+                      padding: '1rem 1.25rem',
+                      borderRadius: message.sender === 'user' ? '20px 20px 8px 20px' : '20px 20px 20px 8px',
+                      background: message.sender === 'user' 
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                        : 'rgba(248, 250, 252, 0.8)',
+                      color: message.sender === 'user' ? 'white' : '#334155',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      border: message.sender === 'bot' ? '1px solid rgba(0, 0, 0, 0.05)' : 'none'
+                    }}>
+                      <p style={{
+                        margin: 0,
+                        lineHeight: '1.6',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {message.text}
+                      </p>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        opacity: 0.8,
+                        marginTop: '0.5rem'
+                      }}>
+                        {message.timestamp.toLocaleTimeString()}
+                      </div>
+                    </div>
+
+                    {message.sender === 'user' && (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        borderRadius: '50%',
+                        padding: '0.5rem',
+                        marginLeft: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '2.5rem',
+                        height: '2.5rem'
+                      }}>
+                        <User style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {isTyping && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      borderRadius: '50%',
+                      padding: '0.5rem',
+                      marginRight: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '2.5rem',
+                      height: '2.5rem'
+                    }}>
+                      <Bot style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
+                    </div>
+                    
+                    <div style={{
+                      padding: '1rem 1.25rem',
+                      borderRadius: '20px 20px 20px 8px',
+                      background: 'rgba(248, 250, 252, 0.8)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#667eea',
+                          animation: 'pulse 1.5s ease-in-out infinite'
+                        }}></div>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#667eea',
+                          animation: 'pulse 1.5s ease-in-out infinite 0.1s'
+                        }}></div>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#667eea',
+                          animation: 'pulse 1.5s ease-in-out infinite 0.2s'
+                        }}></div>
+                        <span style={{ marginLeft: '0.5rem', color: '#667eea', fontSize: '0.875rem' }}>
+                          AI is thinking...
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Scroll anchor */}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Fixed Input Area - Only show in new chat mode */}
+      {viewMode === 'new' && (
+        <div style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '1.5rem 2rem',
+          background: 'white',
+          borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+          zIndex: 1000
+        }}>
+          <div style={{
+            maxWidth: '900px',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}>
+            <div style={{ flex: '1', position: 'relative' }}>
+              <textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask me anything about your finances..."
+                style={{
+                  width: '100%',
+                  resize: 'none',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '16px',
+                  padding: '1rem 1.25rem',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'inherit',
+                  background: '#f9fafb'
+                }}
+                rows={1}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#667eea';
+                  e.target.style.background = 'white';
+                  e.target.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e5e7eb';
+                  e.target.style.background = '#f9fafb';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+            <button
+              onClick={() => handleSendMessage()}
+              disabled={!inputMessage.trim() || isTyping}
+              style={{
+                background: inputMessage.trim() && !isTyping 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                  : '#e5e7eb',
+                color: inputMessage.trim() && !isTyping ? 'white' : '#9ca3af',
+                border: 'none',
                 borderRadius: '16px',
+                padding: '1rem',
+                cursor: inputMessage.trim() && !isTyping ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 1.5rem auto',
-                boxShadow: '0 12px 24px rgba(0, 0, 0, 0.2)'
-              }}>
-                <feature.icon style={{ width: '2rem', height: '2rem', color: 'white' }} />
-              </div>
-              <h3 style={{
-                fontSize: '1.25rem',
-                fontWeight: '700',
-                color: '#1f2937',
-                marginBottom: '1rem'
-              }}>
-                {feature.title}
-              </h3>
-              <p style={{
-                color: '#6b7280',
-                fontSize: '0.975rem',
-                lineHeight: '1.6',
-                margin: '0'
-              }}>
-                {feature.description}
-              </p>
-            </div>
-          ))}
+                minWidth: '3.5rem',
+                height: '3.5rem'
+              }}
+              onMouseEnter={(e) => {
+                if (inputMessage.trim() && !isTyping) {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(102, 126, 234, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <Send style={{ width: '1.25rem', height: '1.25rem' }} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Add keyframe animations */}
-      <style>
-        {`
-          @keyframes pulse {
-            0%, 70%, 100% {
-              transform: scale(1);
-              opacity: 1;
-            }
-            35% {
-              transform: scale(1.2);
-              opacity: 0.5;
-            }
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 70%, 100% {
+            opacity: 0.4;
+            transform: scale(0.8);
           }
-          
-          @keyframes spin {
-            0% {
-              transform: rotate(0deg);
-            }
-            100% {
-              transform: rotate(360deg);
-            }
+          35% {
+            opacity: 1;
+            transform: scale(1);
           }
-        `}
-      </style>
+        }
+      `}</style>
     </div>
   );
 };
