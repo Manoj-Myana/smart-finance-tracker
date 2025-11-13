@@ -35,10 +35,12 @@ interface Transaction {
   created_at: string;
 }
 
+type ViewMode = 'new' | 'history';
+
 const Chatbot: React.FC = () => {
   const [user, setUser] = useState<UserType | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [viewMode, setViewMode] = useState<'new' | 'history'>('new');
+  const [viewMode, setViewMode] = useState<ViewMode>('new');
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
@@ -292,6 +294,43 @@ const Chatbot: React.FC = () => {
         textAlign: 'center'
       }}>Chat History</h2>
       
+      {/* New Chat Button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        marginBottom: '1.5rem'
+      }}>
+        <button
+          onClick={startNewChat}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1.5rem',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+          }}
+        >
+          <Plus style={{ width: '1rem', height: '1rem' }} />
+          Start New Chat
+        </button>
+      </div>
+      
       {chatSessions.length === 0 ? (
         <div style={{
           textAlign: 'center',
@@ -390,69 +429,16 @@ const Chatbot: React.FC = () => {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       overflow: 'hidden',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      paddingTop: '80px'
     }}>
-      {/* Header with Toggle Buttons */}
-      <div style={{
-        padding: '1rem',
-        background: 'rgba(255, 255, 255, 0.9)',
-        borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '1rem',
-        zIndex: 10
-      }}>
-        <button
-          onClick={startNewChat}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '12px',
-            border: 'none',
-            cursor: 'pointer',
-            fontWeight: '600',
-            transition: 'all 0.2s ease',
-            background: viewMode === 'new' 
-              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-              : 'rgba(255, 255, 255, 0.8)',
-            color: viewMode === 'new' ? 'white' : '#64748b',
-            boxShadow: viewMode === 'new' ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none'
-          }}
-        >
-          <Plus style={{ width: '1rem', height: '1rem' }} />
-          New Chat
-        </button>
-        <button
-          onClick={() => setViewMode('history')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '12px',
-            border: 'none',
-            cursor: 'pointer',
-            fontWeight: '600',
-            transition: 'all 0.2s ease',
-            background: viewMode === 'history' 
-              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-              : 'rgba(255, 255, 255, 0.8)',
-            color: viewMode === 'history' ? 'white' : '#64748b',
-            boxShadow: viewMode === 'history' ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none'
-          }}
-        >
-          <History style={{ width: '1rem', height: '1rem' }} />
-          Chat History ({chatSessions.length})
-        </button>
-      </div>
 
       {/* Main Content Area */}
       <div style={{
         flex: 1,
         overflow: 'auto',
-        padding: viewMode === 'history' ? '0' : '2rem 1rem'
+        padding: viewMode === 'history' ? '0' : '2rem 1rem',
+        paddingTop: '1rem'
       }}>
         {viewMode === 'history' ? (
           <HistoryView />
@@ -499,6 +485,59 @@ const Chatbot: React.FC = () => {
               }}>
                 Get personalized financial insights and smart recommendations powered by advanced AI
               </p>
+            </div>
+
+            {/* Chat Mode Toggle Buttons */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '1rem',
+              marginBottom: '2rem'
+            }}>
+              <button
+                onClick={startNewChat}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '12px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s ease',
+                  background: viewMode === 'new' 
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : 'rgba(255, 255, 255, 0.8)',
+                  color: viewMode === 'new' ? 'white' : '#64748b',
+                  boxShadow: viewMode === 'new' ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none'
+                }}
+              >
+                <Plus style={{ width: '1rem', height: '1rem' }} />
+                New Chat
+              </button>
+              <button
+                onClick={() => setViewMode('history')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '12px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s ease',
+                  background: (viewMode as ViewMode) === 'history' 
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : 'rgba(255, 255, 255, 0.8)',
+                  color: (viewMode as ViewMode) === 'history' ? 'white' : '#64748b',
+                  boxShadow: (viewMode as ViewMode) === 'history' ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none'
+                }}
+              >
+                <History style={{ width: '1rem', height: '1rem' }} />
+                Chat History ({chatSessions.length})
+              </button>
             </div>
 
             {/* Quick Question Pills */}
