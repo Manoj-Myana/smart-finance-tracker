@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Send, Bot, User, Sparkles, TrendingUp, PieChart, Target, Zap } from 'lucide-react';
+import { generateChatbotResponse, fetchUserTransactions } from '../services/chatbotService';
 
 interface Message {
   id: number;
@@ -9,11 +11,30 @@ interface Message {
   type?: 'text' | 'suggestion';
 }
 
+interface UserType {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
+interface Transaction {
+  id: number;
+  user_id: number;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  frequency: 'regular' | 'irregular';
+  created_at: string;
+}
+
 const Chatbot: React.FC = () => {
+  const [user, setUser] = useState<UserType | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Welcome to your Smart Finance Assistant! 🚀 I'm here to help you master your finances with AI-powered insights. What would you like to explore today?",
+      text: "Welcome to your Smart Finance Assistant! 🚀 I'm here to help you master your finances with AI-powered insights. I have access to your transaction history and can provide personalized advice. What would you like to explore today?",
       sender: 'bot',
       timestamp: new Date(),
       type: 'text'
@@ -21,7 +42,9 @@ const Chatbot: React.FC = () => {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationContext, setConversationContext] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,11 +54,63 @@ const Chatbot: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    // Get user data and fetch transactions
+    const userData = localStorage.getItem('userData');
+    const token = localStorage.getItem('authToken');
+
+    if (!userData || !token) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      
+      // Fetch user's transactions for chatbot analysis
+      fetchUserTransactions(parsedUser.id).then(userTransactions => {
+        setTransactions(userTransactions);
+        console.log('💰 Loaded transactions for chatbot:', userTransactions.length);
+        
+        // Update welcome message with transaction count
+        if (userTransactions.length > 0) {
+          setMessages(prev => [
+            {
+              ...prev[0],
+              text: `Welcome back, ${parsedUser.fullName}! 🚀 I'm your Smart Finance Assistant with AI-powered insights. I've analyzed your ${userTransactions.length} recent transactions and I'm ready to help you optimize your finances. What would you like to explore today?`
+            }
+          ]);
+        } else {
+          setMessages(prev => [
+            {
+              ...prev[0],
+              text: `Welcome, ${parsedUser.fullName}! 🚀 I'm your Smart Finance Assistant. I notice you don't have any transactions yet. Once you add some transactions, I'll be able to provide personalized financial insights and advice. In the meantime, feel free to ask me general financial questions!`
+            }
+          ]);
+        }
+      }).catch(error => {
+        console.error('Error fetching transactions:', error);
+        setMessages(prev => [
+          {
+            ...prev[0],
+            text: `Welcome, ${parsedUser.fullName}! 🚀 I'm your Smart Finance Assistant. I'm having trouble accessing your transaction data right now, but I can still help with general financial advice and guidance. What would you like to know?`
+          }
+        ]);
+      });
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      navigate('/login');
+    }
+  }, [navigate]);
+
   const quickQuestions = [
-    "How can I create a budget?",
-    "What are my spending trends?",
-    "Help me set financial goals",
-    "How to save money effectively?"
+    "How much did I spend this month?",
+    "What are my biggest spending categories?", 
+    "How can I save more money?",
+    "Am I overspending in any area?",
+    "Show me my financial summary",
+    "What's my savings rate?"
   ];
 
   const handleQuickQuestion = (question: string) => {
@@ -43,9 +118,9 @@ const Chatbot: React.FC = () => {
     handleSendMessage(question);
   };
 
-  const handleSendMessage = (customMessage?: string) => {
+  const handleSendMessage = async (customMessage?: string) => {
     const messageText = customMessage || inputMessage;
-    if (messageText.trim() === '') return;
+    if (messageText.trim() === '' || !user) return;
 
     const newMessage: Message = {
       id: messages.length + 1,
@@ -59,28 +134,51 @@ const Chatbot: React.FC = () => {
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate bot response with more realistic delay
-    setTimeout(() => {
-      const botResponses = [
-        "Great question! Based on your financial data, I recommend starting with tracking your monthly expenses. Would you like me to help you analyze your spending patterns?",
-        "I can help you with that! Let's break down your financial goals into manageable steps. First, let's understand your current financial situation better.",
-        "Excellent! Financial planning is key to success. I can provide personalized insights based on your transaction history and spending habits.",
-        "That's a smart approach! I can guide you through creating a budget that aligns with your income and financial objectives."
-      ];
+    try {
+      // Add to conversation context
+      const newContext = [...conversationContext, `User: ${messageText}`];
       
-      const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
-      
+      console.log('🤖 Sending message to chatbot service...');
+      const response = await generateChatbotResponse({
+        message: messageText,
+        user: user,
+        transactions: transactions,
+        context: newContext.slice(-10) // Keep last 10 context items
+      });
+
+      console.log('📨 Received response:', response);
+
       const botResponse: Message = {
         id: messages.length + 2,
-        text: randomResponse,
+        text: response.response,
         sender: 'bot',
         timestamp: new Date(),
         type: 'text'
       };
       
       setMessages(prev => [...prev, botResponse]);
+      
+      // Update conversation context
+      setConversationContext([
+        ...newContext,
+        `Assistant: ${response.response}`
+      ].slice(-10)); // Keep last 10 context items
+      
+    } catch (error) {
+      console.error('💥 Error getting chatbot response:', error);
+      
+      const errorResponse: Message = {
+        id: messages.length + 2,
+        text: "I apologize, but I'm having trouble processing your request right now. This could be due to a temporary issue with my AI system. Please try again in a moment, or ask a different question. I'm here to help with your financial analysis and advice!",
+        sender: 'bot',
+        timestamp: new Date(),
+        type: 'text'
+      };
+      
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -314,7 +412,7 @@ const Chatbot: React.FC = () => {
           </div>
 
           {/* Quick Questions */}
-          {messages.length === 1 && (
+          {messages.length === 1 && user && transactions.length > 0 && (
             <div style={{
               padding: '0 2rem 1rem 2rem',
               background: 'linear-gradient(to bottom, #f1f5f9, #e2e8f0)'
@@ -325,11 +423,11 @@ const Chatbot: React.FC = () => {
                 marginBottom: '1rem',
                 fontWeight: '500'
               }}>
-                Quick questions to get started:
+                💡 Here are some personalized questions based on your {transactions.length} transactions:
               </p>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                 gap: '0.5rem'
               }}>
                 {quickQuestions.map((question, index) => (
@@ -364,6 +462,42 @@ const Chatbot: React.FC = () => {
                   </button>
                 ))}
               </div>
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: 'rgba(34, 197, 94, 0.1)',
+                borderRadius: '12px',
+                border: '1px solid rgba(34, 197, 94, 0.2)'
+              }}>
+                <p style={{
+                  fontSize: '0.8rem',
+                  color: '#059669',
+                  margin: '0',
+                  textAlign: 'center'
+                }}>
+                  ✨ I can analyze your {transactions.filter(t => t.type === 'debit').length} expenses and {transactions.filter(t => t.type === 'credit').length} income transactions to give you personalized financial insights!
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Loading state for new users */}
+          {!user && (
+            <div style={{
+              padding: '2rem',
+              textAlign: 'center',
+              color: '#64748b'
+            }}>
+              <div style={{
+                display: 'inline-block',
+                width: '2rem',
+                height: '2rem',
+                border: '3px solid #e5e7eb',
+                borderTop: '3px solid #667eea',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+              <p style={{ marginTop: '1rem', fontSize: '0.875rem' }}>Loading your financial data...</p>
             </div>
           )}
 
@@ -541,6 +675,15 @@ const Chatbot: React.FC = () => {
             35% {
               transform: scale(1.2);
               opacity: 0.5;
+            }
+          }
+          
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
             }
           }
         `}
